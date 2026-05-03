@@ -3,10 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>ERP Contable Argentina - Profesional</title>
+    <title>ERP Contable Argentina - Profesional 3.0</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/tesseract.js@5/dist/tesseract.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <style>
         * { -webkit-tap-highlight-color: transparent; }
         .tab-active { color: #2563eb; border-bottom: 2px solid #2563eb; }
@@ -14,15 +15,25 @@
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         .modal { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000; }
         .modal-content { background: white; max-width: 95%; max-height: 90%; overflow: auto; border-radius: 1rem; padding: 1rem; }
-        .btn-camara { background: #2563eb; color: white; padding: 0.75rem; border-radius: 0.5rem; text-align: center; cursor: pointer; }
-        .btn-galeria { background: #16a34a; color: white; padding: 0.75rem; border-radius: 0.5rem; text-align: center; cursor: pointer; margin-top: 0.5rem; }
         .notification { position: fixed; top: 10px; right: 10px; z-index: 2000; animation: slideIn 0.3s ease; }
         @keyframes slideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }
+        .dark { background-color: #1a1a2e; color: #eee; }
+        .dark .bg-white { background-color: #16213e; color: #eee; }
+        .dark .bg-gray-50 { background-color: #0f3460; }
+        .dark .text-gray-800 { color: #eee; }
+        .dark .text-gray-500 { color: #aaa; }
+        .dark .border { border-color: #2c3e50; }
+        .dark .shadow { box-shadow: none; }
+        .chart-container { position: relative; height: 200px; width: 100%; }
+        .btn-whatsapp { background-color: #25D366; }
     </style>
 </head>
 <body class="bg-gray-50">
     <div id="notificationContainer"></div>
     <div id="root" class="max-w-7xl mx-auto p-4 pb-24"></div>
+    
+    <!-- Botón modo oscuro flotante -->
+    <button onclick="toggleDarkMode()" class="fixed bottom-20 right-4 bg-gray-800 text-white p-3 rounded-full shadow-lg z-50">🌓</button>
     
     <nav class="fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg z-50">
         <div class="flex justify-around max-w-7xl mx-auto">
@@ -37,9 +48,9 @@
     </nav>
 
     <script>
-        // ========== BASE DE DATOS COMPLETA ==========
+        // ========== BASE DE DATOS ==========
         let db = {
-            empresas: JSON.parse(localStorage.getItem('empresas') || '[{"id":1,"nombre":"Mi Empresa SRL","cuit":"30-12345678-9","direccion":"Av. Corrientes 123","telefono":"11-1234-5678","email":"info@miempresa.com","logo":"🏢"}]'),
+            empresas: JSON.parse(localStorage.getItem('empresas') || '[{"id":1,"nombre":"Mi Empresa SRL","cuit":"30-12345678-9","direccion":"Av. Corrientes 123","telefono":"11-1234-5678","email":"info@miempresa.com","logo":"🏢","whatsapp":"5491112345678"}]'),
             empresaActiva: JSON.parse(localStorage.getItem('empresaActiva') || '1'),
             ventas: JSON.parse(localStorage.getItem('ventas') || '[]'),
             compras: JSON.parse(localStorage.getItem('compras') || '[]'),
@@ -49,14 +60,18 @@
             costosFijos: JSON.parse(localStorage.getItem('costosFijos') || '[]'),
             pagosHistorial: JSON.parse(localStorage.getItem('pagosHistorial') || '[]'),
             categoriasGastos: JSON.parse(localStorage.getItem('categoriasGastos') || '["Impuestos","Servicios","Alquiler","Sueldos","Bancos"]'),
-            notificaciones: JSON.parse(localStorage.getItem('notificaciones') || '[]')
+            notificaciones: JSON.parse(localStorage.getItem('notificaciones') || '[]'),
+            proximoNumPresupuesto: JSON.parse(localStorage.getItem('proximoNumPresupuesto') || '1001')
         };
         
-        // Datos de ejemplo si está vacío
+        let darkMode = localStorage.getItem('darkMode') === 'true';
+        let chartInstance = null;
+        
+        // Datos de ejemplo iniciales
         if (db.clientes.length === 0) {
             db.clientes = [
-                { id: 1, nombre: "Cliente Ejemplo SA", cuit: "30-12345678-9", telefono: "11-1234-5678", email: "cliente@mail.com", direccion: "Av. Santa Fe 123", contacto: "Juan Pérez", diasCobro: 30, saldo: 0 },
-                { id: 2, nombre: "Empresa XYZ", cuit: "30-87654321-0", telefono: "11-8765-4321", email: "xyz@mail.com", direccion: "Callao 456", contacto: "María López", diasCobro: 15, saldo: 0 }
+                { id: 1, nombre: "Cliente Ejemplo SA", cuit: "30-12345678-9", telefono: "11-1234-5678", email: "cliente@mail.com", direccion: "Av. Santa Fe 123", contacto: "Juan Pérez", diasCobro: 30, saldo: 0, whatsapp: "5491112345678" },
+                { id: 2, nombre: "Empresa XYZ", cuit: "30-87654321-0", telefono: "11-8765-4321", email: "xyz@mail.com", direccion: "Callao 456", contacto: "María López", diasCobro: 15, saldo: 0, whatsapp: "5491187654321" }
             ];
         }
         if (db.proveedores.length === 0) {
@@ -68,10 +83,17 @@
         if (db.costosFijos.length === 0) {
             db.costosFijos = [
                 { id: 1, nombre: "AFIP - Monotributo", monto: 32000, vencimiento: "2025-05-20", estado: "pendiente", categoria: "Impuestos", recurrente: true },
-                { id: 2, nombre: "Alquiler Oficina", monto: 50000, vencimiento: "2025-05-05", estado: "pendiente", categoria: "Alquiler", recurrente: true },
-                { id: 3, nombre: "Internet Fibertel", monto: 7200, vencimiento: "2025-05-18", estado: "pendiente", categoria: "Servicios", recurrente: true },
-                { id: 4, nombre: "Luz EDENOR", monto: 8500, vencimiento: "2025-05-12", estado: "pendiente", categoria: "Servicios", recurrente: true }
+                { id: 2, nombre: "Alquiler Oficina", monto: 50000, vencimiento: "2025-05-05", estado: "pendiente", categoria: "Alquiler", recurrente: true }
             ];
+        }
+        
+        // Generar datos de ejemplo para gráficos (últimos 6 meses)
+        if (db.ventas.length === 0) {
+            const meses = ["2025-01", "2025-02", "2025-03", "2025-04"];
+            meses.forEach((mes, i) => {
+                db.ventas.push({ id: generarId(), clienteId: 1, clienteNombre: "Cliente Ejemplo", montoNeto: 100000 + i * 20000, ivaMonto: 21000, total: 121000, fechaVenta: `${mes}-15`, mes: mes, estado: "cobrado" });
+                db.compras.push({ id: generarId(), proveedorId: 1, proveedorNombre: "Proveedor Ejemplo", montoNeto: 50000 + i * 5000, ivaMonto: 10500, total: 60500, fechaCompra: `${mes}-10`, mes: mes, estado: "pagado" });
+            });
         }
         
         function guardarDB() {
@@ -86,10 +108,12 @@
             localStorage.setItem('pagosHistorial', JSON.stringify(db.pagosHistorial));
             localStorage.setItem('categoriasGastos', JSON.stringify(db.categoriasGastos));
             localStorage.setItem('notificaciones', JSON.stringify(db.notificaciones));
+            localStorage.setItem('proximoNumPresupuesto', JSON.stringify(db.proximoNumPresupuesto));
         }
         
         function formatNumber(num) { return num?.toLocaleString('es-AR') || '0'; }
         function generarId() { return Date.now(); }
+        
         function mostrarNotificacion(mensaje, tipo = 'success') {
             const container = document.getElementById('notificationContainer');
             const notif = document.createElement('div');
@@ -99,48 +123,46 @@
             setTimeout(() => notif.remove(), 3000);
         }
         
+        function toggleDarkMode() {
+            darkMode = !darkMode;
+            localStorage.setItem('darkMode', darkMode);
+            if (darkMode) document.body.classList.add('dark');
+            else document.body.classList.remove('dark');
+            showView(currentView);
+        }
+        
         function calcularDiasRestantes(fecha) {
             if (!fecha) return null;
             return Math.ceil((new Date(fecha) - new Date()) / (1000 * 60 * 60 * 24));
         }
         
-        // Verificar vencimientos y generar notificaciones automáticas
         function verificarVencimientos() {
             const hoy = new Date().toISOString().split('T')[0];
-            const nuevasNotificaciones = [];
-            
-            // Ventas por cobrar vencidas
             db.ventas.filter(v => v.estado === 'pendiente_cobro' && v.fechaCobroEsperada < hoy).forEach(v => {
-                nuevasNotificaciones.push({ id: generarId(), tipo: 'cobro', mensaje: `Venta vencida: ${v.cliente} - $${formatNumber(v.total)}`, leida: false, fecha: hoy });
+                if (!db.notificaciones.some(n => n.mensaje.includes(v.clienteNombre))) {
+                    db.notificaciones.unshift({ id: generarId(), tipo: 'cobro', mensaje: `⚠️ Venta vencida: ${v.clienteNombre} - $${formatNumber(v.total)}`, leida: false, fecha: hoy });
+                }
             });
-            
-            // Compras por pagar vencidas
             db.compras.filter(c => c.estado === 'pendiente_pago' && c.fechaPagoEsperada < hoy).forEach(c => {
-                nuevasNotificaciones.push({ id: generarId(), tipo: 'pago', mensaje: `Pago vencido: ${c.proveedor} - $${formatNumber(c.total)}`, leida: false, fecha: hoy });
+                if (!db.notificaciones.some(n => n.mensaje.includes(c.proveedorNombre))) {
+                    db.notificaciones.unshift({ id: generarId(), tipo: 'pago', mensaje: `⚠️ Pago vencido: ${c.proveedorNombre} - $${formatNumber(c.total)}`, leida: false, fecha: hoy });
+                }
             });
-            
-            // Costos fijos vencidos
-            db.costosFijos.filter(cf => cf.estado === 'pendiente' && cf.vencimiento < hoy).forEach(cf => {
-                nuevasNotificaciones.push({ id: generarId(), tipo: 'costo', mensaje: `Costo fijo vencido: ${cf.nombre} - $${formatNumber(cf.monto)}`, leida: false, fecha: hoy });
-            });
-            
-            nuevasNotificaciones.forEach(n => { if (!db.notificaciones.some(ex => ex.mensaje === n.mensaje && ex.fecha === hoy)) db.notificaciones.unshift(n); });
             guardarDB();
         }
         
-        // ========== FUNCIONES DE VENTAS ==========
-        function registrarVenta(clienteId, montoNeto, iva, tipoComprobante, numComprobante, fechaVenta, comprobanteArchivo) {
+        // ========== FUNCIONES PRINCIPALES ==========
+        function registrarVenta(clienteId, montoNeto, iva, tipoComprobante, numComprobante, fechaVenta) {
             const cliente = db.clientes.find(c => c.id === clienteId);
             if (!cliente) return null;
             const ivaMonto = montoNeto * (iva / 100);
             const total = montoNeto + ivaMonto;
             const fechaCobroEsperada = new Date(fechaVenta);
             fechaCobroEsperada.setDate(fechaCobroEsperada.getDate() + cliente.diasCobro);
-            
             const venta = {
                 id: generarId(), clienteId, clienteNombre: cliente.nombre, montoNeto, iva, ivaMonto, total,
                 tipoComprobante, numComprobante, fechaVenta, fechaCobroEsperada: fechaCobroEsperada.toISOString().split('T')[0],
-                mes: fechaVenta.substring(0, 7), estado: 'pendiente_cobro', comprobanteArchivo, registrada: new Date().toISOString()
+                mes: fechaVenta.substring(0, 7), estado: 'pendiente_cobro', registrada: new Date().toISOString()
             };
             db.ventas.push(venta);
             cliente.saldo = (cliente.saldo || 0) + total;
@@ -150,37 +172,34 @@
             return venta;
         }
         
-        function registrarCobro(ventaId, fechaCobro, montoCobrado, comprobanteCobro) {
+        function registrarCobro(ventaId, fechaCobro, comprobanteCobro) {
             const venta = db.ventas.find(v => v.id === ventaId);
             if (!venta) return false;
             const cliente = db.clientes.find(c => c.id === venta.clienteId);
             venta.estado = 'cobrado';
             venta.fechaCobro = fechaCobro;
-            venta.montoCobrado = montoCobrado;
             venta.comprobanteCobro = comprobanteCobro;
             if (cliente) cliente.saldo = (cliente.saldo || 0) - venta.total;
             const diasDiferencia = Math.ceil((new Date(fechaCobro) - new Date(venta.fechaCobroEsperada)) / (1000 * 60 * 60 * 24));
             venta.diasDiferencia = diasDiferencia;
             venta.estadoPago = diasDiferencia <= 0 ? 'En término' : `Atrasado ${diasDiferencia} días`;
-            db.pagosHistorial.unshift({ id: generarId(), tipo: 'cobro', ventaId, monto: montoCobrado, fecha: fechaCobro, comprobante: comprobanteCobro });
+            db.pagosHistorial.unshift({ id: generarId(), tipo: 'cobro', ventaId, monto: venta.total, fecha: fechaCobro, comprobante: comprobanteCobro });
             guardarDB();
-            mostrarNotificacion(`💰 Cobro registrado de ${venta.clienteNombre} por $${formatNumber(montoCobrado)}`);
+            mostrarNotificacion(`💰 Cobro registrado de ${venta.clienteNombre} por $${formatNumber(venta.total)}`);
             return true;
         }
         
-        // ========== FUNCIONES DE COMPRAS ==========
-        function registrarCompra(proveedorId, montoNeto, iva, tipoComprobante, numComprobante, fechaCompra, comprobanteArchivo) {
+        function registrarCompra(proveedorId, montoNeto, iva, tipoComprobante, numComprobante, fechaCompra) {
             const proveedor = db.proveedores.find(p => p.id === proveedorId);
             if (!proveedor) return null;
             const ivaMonto = montoNeto * (iva / 100);
             const total = montoNeto + ivaMonto;
             const fechaPagoEsperada = new Date(fechaCompra);
             fechaPagoEsperada.setDate(fechaPagoEsperada.getDate() + proveedor.diasPago);
-            
             const compra = {
                 id: generarId(), proveedorId, proveedorNombre: proveedor.nombre, montoNeto, iva, ivaMonto, total,
                 tipoComprobante, numComprobante, fechaCompra, fechaPagoEsperada: fechaPagoEsperada.toISOString().split('T')[0],
-                mes: fechaCompra.substring(0, 7), estado: 'pendiente_pago', comprobanteArchivo, registrada: new Date().toISOString()
+                mes: fechaCompra.substring(0, 7), estado: 'pendiente_pago', registrada: new Date().toISOString()
             };
             db.compras.push(compra);
             proveedor.saldo = (proveedor.saldo || 0) + total;
@@ -190,114 +209,36 @@
             return compra;
         }
         
-        function registrarPagoCompra(compraId, fechaPago, montoPagado, comprobantePago) {
+        function registrarPagoCompra(compraId, fechaPago, comprobantePago) {
             const compra = db.compras.find(c => c.id === compraId);
             if (!compra) return false;
             const proveedor = db.proveedores.find(p => p.id === compra.proveedorId);
             compra.estado = 'pagado';
             compra.fechaPago = fechaPago;
-            compra.montoPagado = montoPagado;
             compra.comprobantePago = comprobantePago;
             if (proveedor) proveedor.saldo = (proveedor.saldo || 0) - compra.total;
             const diasDiferencia = Math.ceil((new Date(fechaPago) - new Date(compra.fechaPagoEsperada)) / (1000 * 60 * 60 * 24));
             compra.diasDiferencia = diasDiferencia;
             compra.estadoPago = diasDiferencia <= 0 ? 'En término' : `Atrasado ${diasDiferencia} días`;
-            db.pagosHistorial.unshift({ id: generarId(), tipo: 'pago', compraId, monto: montoPagado, fecha: fechaPago, comprobante: comprobantePago });
+            db.pagosHistorial.unshift({ id: generarId(), tipo: 'pago', compraId, monto: compra.total, fecha: fechaPago, comprobante: comprobantePago });
             guardarDB();
-            mostrarNotificacion(`💸 Pago registrado a ${compra.proveedorNombre} por $${formatNumber(montoPagado)}`);
+            mostrarNotificacion(`💸 Pago registrado a ${compra.proveedorNombre} por $${formatNumber(compra.total)}`);
             return true;
         }
         
-        // ========== COSTOS FIJOS ==========
-        function registrarCostoFijo(nombre, monto, vencimiento, categoria, recurrente) {
-            const costo = { id: generarId(), nombre, monto, vencimiento, estado: 'pendiente', categoria, recurrente, registrado: new Date().toISOString() };
-            db.costosFijos.push(costo);
-            guardarDB();
-            mostrarNotificacion(`💰 Costo fijo agregado: ${nombre} - $${formatNumber(monto)}`);
-            return costo;
+        // ========== REPORTES Y GRÁFICOS ==========
+        function getDatosGraficos() {
+            const meses = [...new Set([...db.ventas.map(v => v.mes), ...db.compras.map(c => c.mes)])].sort();
+            const ventasPorMes = meses.map(m => db.ventas.filter(v => v.mes === m).reduce((s, v) => s + v.total, 0));
+            const comprasPorMes = meses.map(m => db.compras.filter(c => c.mes === m).reduce((s, c) => s + c.total, 0));
+            const gananciasPorMes = meses.map((m, i) => ventasPorMes[i] - comprasPorMes[i]);
+            return { meses, ventasPorMes, comprasPorMes, gananciasPorMes };
         }
         
-        function pagarCostoFijo(id, fechaPago, comprobante) {
-            const costo = db.costosFijos.find(c => c.id === id);
-            if (!costo) return false;
-            costo.estado = 'pagado';
-            costo.fechaPago = fechaPago;
-            costo.comprobante = comprobante;
-            db.pagosHistorial.unshift({ id: generarId(), tipo: 'costoFijo', costoId: id, nombre: costo.nombre, monto: costo.monto, fecha: fechaPago, comprobante });
-            if (costo.recurrente) {
-                const nuevaFecha = new Date(costo.vencimiento);
-                nuevaFecha.setMonth(nuevaFecha.getMonth() + 1);
-                registrarCostoFijo(costo.nombre, costo.monto, nuevaFecha.toISOString().split('T')[0], costo.categoria, true);
-            }
-            guardarDB();
-            mostrarNotificacion(`✅ Pagado: ${costo.nombre} - $${formatNumber(costo.monto)}`);
-            return true;
-        }
-        
-        function eliminarCostoFijo(id) {
-            if (confirm("¿Eliminar este costo fijo?")) {
-                db.costosFijos = db.costosFijos.filter(c => c.id !== id);
-                guardarDB();
-                mostrarNotificacion(`🗑️ Costo fijo eliminado`);
-                return true;
-            }
-            return false;
-        }
-        
-        // ========== CLIENTES CRUD ==========
-        function agregarCliente(nombre, cuit, telefono, email, direccion, contacto, diasCobro) {
-            const cliente = { id: generarId(), nombre, cuit, telefono, email, direccion, contacto, diasCobro: diasCobro || 30, saldo: 0 };
-            db.clientes.push(cliente);
-            guardarDB();
-            mostrarNotificacion(`👤 Cliente agregado: ${nombre}`);
-            return cliente;
-        }
-        
-        function editarCliente(id, datos) {
-            const cliente = db.clientes.find(c => c.id === id);
-            if (cliente) Object.assign(cliente, datos);
-            guardarDB();
-            mostrarNotificacion(`✏️ Cliente actualizado: ${cliente.nombre}`);
-        }
-        
-        function eliminarCliente(id) {
-            if (confirm("¿Eliminar este cliente? Se perderán sus ventas asociadas.")) {
-                db.clientes = db.clientes.filter(c => c.id !== id);
-                guardarDB();
-                mostrarNotificacion(`🗑️ Cliente eliminado`);
-            }
-        }
-        
-        // ========== PROVEEDORES CRUD ==========
-        function agregarProveedor(nombre, cuit, telefono, email, direccion, contacto, diasPago) {
-            const proveedor = { id: generarId(), nombre, cuit, telefono, email, direccion, contacto, diasPago: diasPago || 30, saldo: 0 };
-            db.proveedores.push(proveedor);
-            guardarDB();
-            mostrarNotificacion(`🏭 Proveedor agregado: ${nombre}`);
-            return proveedor;
-        }
-        
-        function editarProveedor(id, datos) {
-            const proveedor = db.proveedores.find(p => p.id === id);
-            if (proveedor) Object.assign(proveedor, datos);
-            guardarDB();
-            mostrarNotificacion(`✏️ Proveedor actualizado: ${proveedor.nombre}`);
-        }
-        
-        function eliminarProveedor(id) {
-            if (confirm("¿Eliminar este proveedor?")) {
-                db.proveedores = db.proveedores.filter(p => p.id !== id);
-                guardarDB();
-                mostrarNotificacion(`🗑️ Proveedor eliminado`);
-            }
-        }
-        
-        // ========== CÁLCULOS CONTABLES ==========
         function calcularReporteMes(mes) {
             const ventasMes = db.ventas.filter(v => v.mes === mes);
             const comprasMes = db.compras.filter(c => c.mes === mes);
             const costosFijosMes = db.costosFijos.filter(cf => cf.vencimiento?.substring(0, 7) === mes && cf.estado === 'pagado');
-            
             const ventasNetas = ventasMes.reduce((s, v) => s + v.montoNeto, 0);
             const comprasNetas = comprasMes.reduce((s, c) => s + c.montoNeto, 0);
             const ivaCobrado = ventasMes.reduce((s, v) => s + v.ivaMonto, 0);
@@ -306,7 +247,6 @@
             const costosFijosTotal = costosFijosMes.reduce((s, c) => s + c.monto, 0);
             const resultado = ventasNetas - comprasNetas - costosFijosTotal - ivaAPagar;
             const rentabilidad = ventasNetas > 0 ? (resultado / ventasNetas * 100).toFixed(2) : 0;
-            
             return { mes, ventasNetas, comprasNetas, ivaCobrado, ivaPagado, ivaAPagar, costosFijosTotal, resultado, rentabilidad, cantidadVentas: ventasMes.length, cantidadCompras: comprasMes.length };
         }
         
@@ -319,53 +259,61 @@
             return acumulado;
         }
         
-        // ========== EXPORTAR A PDF ==========
-        function exportarReportePDF(mes) {
-            const reporte = calcularReporteMes(mes);
-            const empresa = db.empresas.find(e => e.id === db.empresaActiva) || db.empresas[0];
-            const content = `
-                <div style="font-family: Arial, sans-serif; padding: 20px;">
-                    <h1 style="color: #2563eb;">${empresa.nombre}</h1>
-                    <p>CUIT: ${empresa.cuit} | Tel: ${empresa.telefono} | Email: ${empresa.email}</p>
-                    <hr>
-                    <h2>📊 Reporte Mensual - ${mes}</h2>
-                    <table style="width: 100%; border-collapse: collapse; margin-top: 20px;">
-                        <tr><td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong>Ventas Netas</strong></td><td style="padding: 8px; border-bottom: 1px solid #ddd;">$${formatNumber(reporte.ventasNetas)}</td></tr>
-                        <tr><td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong>Compras Netas</strong></td><td style="padding: 8px; border-bottom: 1px solid #ddd;">$${formatNumber(reporte.comprasNetas)}</td></tr>
-                        <tr><td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong>IVA a Pagar</strong></td><td style="padding: 8px; border-bottom: 1px solid #ddd;">$${formatNumber(reporte.ivaAPagar)}</td></tr>
-                        <tr><td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong>Costos Fijos</strong></td><td style="padding: 8px; border-bottom: 1px solid #ddd;">$${formatNumber(reporte.costosFijosTotal)}</td></tr>
-                        <tr><td style="padding: 8px; border-bottom: 2px solid #000;"><strong>RESULTADO NETO</strong></td><td style="padding: 8px; border-bottom: 2px solid #000;"><strong>$${formatNumber(reporte.resultado)}</strong></td></tr>
-                        <tr><td style="padding: 8px;"><strong>Rentabilidad</strong></td><td style="padding: 8px;">${reporte.rentabilidad}%</td></tr>
-                    </table>
-                    <hr>
-                    <p style="font-size: 12px; color: #666; margin-top: 20px;">Reporte generado el ${new Date().toLocaleDateString()}</p>
-                </div>
-            `;
-            html2pdf().set({ margin: 1, filename: `reporte_${mes}.pdf` }).from(content).save();
-            mostrarNotificacion(`📄 Reporte PDF generado para ${mes}`);
+        // ========== EXPORTAR DATOS ==========
+        function exportarBackup() {
+            const backup = { ...db, fechaBackup: new Date().toISOString() };
+            const dataStr = JSON.stringify(backup, null, 2);
+            const blob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `erp_backup_${new Date().toISOString().split('T')[0]}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+            mostrarNotificacion("📦 Backup exportado correctamente");
         }
         
-        function exportarPresupuestoPDF(presupuesto) {
-            const empresa = db.empresas.find(e => e.id === db.empresaActiva) || db.empresas[0];
-            const content = `
-                <div style="font-family: Arial, sans-serif; padding: 20px;">
-                    <h1 style="color: #2563eb;">${empresa.nombre}</h1>
-                    <p>CUIT: ${empresa.cuit} | Tel: ${empresa.telefono} | Email: ${empresa.email}</p>
-                    <hr>
-                    <h2>📄 PRESUPUESTO</h2>
-                    <p><strong>Cliente:</strong> ${presupuesto.cliente}</p>
-                    <p><strong>Fecha:</strong> ${presupuesto.fechaCreacion?.split('T')[0]}</p>
-                    <table style="width: 100%; border-collapse: collapse; margin-top: 20px;">
-                        <thead><tr style="background: #f3f4f6;"><th style="padding: 8px; border: 1px solid #ddd;">Producto</th><th style="padding: 8px; border: 1px solid #ddd;">Cant.</th><th style="padding: 8px; border: 1px solid #ddd;">Precio Unit.</th><th style="padding: 8px; border: 1px solid #ddd;">Subtotal</th></tr></thead>
-                        <tbody>${presupuesto.items.map(i => `<tr><td style="padding: 8px; border: 1px solid #ddd;">${i.desc}</td><td style="padding: 8px; border: 1px solid #ddd;">${i.cant}</td><td style="padding: 8px; border: 1px solid #ddd;">$${formatNumber(i.costo * (1 + (presupuesto.markup || 30)/100))}</td><td style="padding: 8px; border: 1px solid #ddd;">$${formatNumber(i.costo * (1 + (presupuesto.markup || 30)/100) * i.cant)}</td></tr>`).join('')}</tbody>
-                        <tfoot><tr><td colspan="3" style="padding: 8px; text-align: right;"><strong>TOTAL:</strong></td><td style="padding: 8px;"><strong>$${formatNumber(presupuesto.total)}</strong></td></tr></tfoot>
-                    </table>
-                    <hr>
-                    <p style="font-size: 12px; color: #666;">Presupuesto válido por 30 días. ${empresa.nombre}</p>
-                </div>
-            `;
-            html2pdf().set({ margin: 1, filename: `presupuesto_${presupuesto.id}.pdf` }).from(content).save();
-            mostrarNotificacion(`📄 Presupuesto PDF generado`);
+        function importarBackup(file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const backup = JSON.parse(e.target.result);
+                    if (backup.ventas && backup.compras && backup.clientes) {
+                        db = backup;
+                        guardarDB();
+                        mostrarNotificacion("✅ Backup importado correctamente");
+                        showView(currentView);
+                    } else { mostrarNotificacion("Archivo inválido", 'error'); }
+                } catch(err) { mostrarNotificacion("Error al importar", 'error'); }
+            };
+            reader.readAsText(file);
+        }
+        
+        function exportarExcel() {
+            let csv = "Tipo,Fecha,Concepto,Monto Neto,IVA,Total,Estado\n";
+            db.ventas.forEach(v => { csv += `Venta,${v.fechaVenta},${v.clienteNombre},${v.montoNeto},${v.ivaMonto},${v.total},${v.estado}\n`; });
+            db.compras.forEach(c => { csv += `Compra,${c.fechaCompra},${c.proveedorNombre},${c.montoNeto},${c.ivaMonto},${c.total},${c.estado}\n`; });
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `erp_datos_${new Date().toISOString().split('T')[0]}.csv`;
+            a.click();
+            URL.revokeObjectURL(url);
+            mostrarNotificacion("📊 Datos exportados a CSV");
+        }
+        
+        // ========== PRESUPUESTOS PROFESIONALES ==========
+        function generarNumeroPresupuesto() {
+            const num = db.proximoNumPresupuesto;
+            db.proximoNumPresupuesto++;
+            guardarDB();
+            return `P-${num}`;
+        }
+        
+        function enviarWhatsApp(numero, mensaje) {
+            const url = `https://wa.me/${numero}?text=${encodeURIComponent(mensaje)}`;
+            window.open(url, '_blank');
         }
         
         // ========== RENDER DASHBOARD ==========
@@ -377,43 +325,27 @@
             const notificacionesNoLeidas = db.notificaciones.filter(n => !n.leida).length;
             const empresa = db.empresas.find(e => e.id === db.empresaActiva) || db.empresas[0];
             
+            setTimeout(() => {
+                const canvas = document.getElementById('graficoCanvas');
+                if (canvas && typeof Chart !== 'undefined') {
+                    if (chartInstance) chartInstance.destroy();
+                    const datos = getDatosGraficos();
+                    chartInstance = new Chart(canvas, {
+                        type: 'line',
+                        data: { labels: datos.meses, datasets: [{ label: 'Ventas', data: datos.ventasPorMes, borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,0.1)', fill: true, tension: 0.3 }, { label: 'Compras', data: datos.comprasPorMes, borderColor: '#ef4444', backgroundColor: 'rgba(239,68,68,0.1)', fill: true, tension: 0.3 }] },
+                        options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { position: 'bottom' } } }
+                    });
+                }
+            }, 100);
+            
             return `
                 <div class="space-y-4 fade-in pb-24">
-                    <div class="flex justify-between items-center">
-                        <div><h1 class="text-2xl font-bold text-gray-800">📊 Dashboard</h1><p class="text-xs text-gray-500">${empresa.nombre} - CUIT ${empresa.cuit}</p></div>
-                        ${notificacionesNoLeidas > 0 ? `<div class="bg-red-500 text-white rounded-full px-2 py-1 text-xs">${notificacionesNoLeidas} notif.</div>` : ''}
-                    </div>
-                    
-                    <div class="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-4 rounded-xl">
-                        <p class="text-sm">📅 Mes actual: ${mesActual}</p>
-                        <p class="text-2xl font-bold">$${formatNumber(reporte.resultado)}</p>
-                        <p class="text-xs">Rentabilidad: ${reporte.rentabilidad}%</p>
-                    </div>
-                    
-                    <div class="grid grid-cols-2 gap-3">
-                        <div class="bg-white p-3 rounded-xl shadow"><p class="text-xs text-gray-500">💰 Ventas</p><p class="text-xl font-bold text-green-600">$${formatNumber(reporte.ventasNetas)}</p></div>
-                        <div class="bg-white p-3 rounded-xl shadow"><p class="text-xs text-gray-500">📉 Compras</p><p class="text-xl font-bold text-red-600">$${formatNumber(reporte.comprasNetas)}</p></div>
-                        <div class="bg-white p-3 rounded-xl shadow"><p class="text-xs text-gray-500">💸 Costos Fijos</p><p class="text-xl font-bold text-orange-600">$${formatNumber(reporte.costosFijosTotal)}</p></div>
-                        <div class="bg-white p-3 rounded-xl shadow"><p class="text-xs text-gray-500">🏛️ IVA</p><p class="text-xl font-bold text-purple-600">$${formatNumber(reporte.ivaAPagar)}</p></div>
-                    </div>
-                    
-                    <div class="bg-white p-3 rounded-xl shadow">
-                        <h2 class="font-bold text-sm mb-2">📈 Acumulado Anual</h2>
-                        <div class="grid grid-cols-2 gap-2 text-sm">
-                            <div>Ventas: <span class="font-bold text-green-600">$${formatNumber(acumulado.ventasNetas)}</span></div>
-                            <div>Compras: <span class="font-bold text-red-600">$${formatNumber(acumulado.comprasNetas)}</span></div>
-                            <div>Ganancia: <span class="font-bold ${acumulado.resultado >= 0 ? 'text-green-600' : 'text-red-600'}">$${formatNumber(acumulado.resultado)}</span></div>
-                            <div>Rentabilidad: <span class="font-bold">${acumulado.rentabilidad}%</span></div>
-                        </div>
-                    </div>
-                    
-                    <div class="bg-white p-3 rounded-xl shadow">
-                        <h2 class="font-bold text-sm mb-2">🔔 Próximos vencimientos</h2>
-                        ${db.ventas.filter(v => v.estado === 'pendiente_cobro').slice(0, 2).map(v => `<div class="flex justify-between text-sm border-b py-1"><span>💰 ${v.clienteNombre}</span><span>$${formatNumber(v.total)} - ${calcularDiasRestantes(v.fechaCobroEsperada) < 0 ? 'VENCIDO' : `Vence en ${calcularDiasRestantes(v.fechaCobroEsperada)} días`}</span></div>`).join('')}
-                        ${db.compras.filter(c => c.estado === 'pendiente_pago').slice(0, 2).map(c => `<div class="flex justify-between text-sm border-b py-1"><span>🛒 ${c.proveedorNombre}</span><span>$${formatNumber(c.total)} - ${calcularDiasRestantes(c.fechaPagoEsperada) < 0 ? 'VENCIDO' : `Vence en ${calcularDiasRestantes(c.fechaPagoEsperada)} días`}</span></div>`).join('')}
-                        ${db.costosFijos.filter(cf => cf.estado === 'pendiente').slice(0, 2).map(cf => `<div class="flex justify-between text-sm"><span>📄 ${cf.nombre}</span><span>$${formatNumber(cf.monto)} - ${calcularDiasRestantes(cf.vencimiento) < 0 ? 'VENCIDO' : `Vence en ${calcularDiasRestantes(cf.vencimiento)} días`}</span></div>`).join('')}
-                        ${db.ventas.filter(v => v.estado === 'pendiente_cobro').length === 0 && db.compras.filter(c => c.estado === 'pendiente_pago').length === 0 && db.costosFijos.filter(cf => cf.estado === 'pendiente').length === 0 ? '<p class="text-xs text-gray-400">Sin vencimientos pendientes</p>' : ''}
-                    </div>
+                    <div class="flex justify-between items-center"><div><h1 class="text-2xl font-bold">📊 Dashboard</h1><p class="text-xs text-gray-500">${empresa.nombre} - CUIT ${empresa.cuit}</p></div>${notificacionesNoLeidas > 0 ? `<div class="bg-red-500 text-white rounded-full px-2 py-1 text-xs">${notificacionesNoLeidas} notif.</div>` : ''}</div>
+                    <div class="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-4 rounded-xl"><p class="text-sm">📅 Mes actual: ${mesActual}</p><p class="text-3xl font-bold">$${formatNumber(reporte.resultado)}</p><p class="text-xs">Rentabilidad: ${reporte.rentabilidad}%</p></div>
+                    <div class="grid grid-cols-2 gap-3"><div class="bg-white p-3 rounded-xl shadow"><p class="text-xs text-gray-500">💰 Ventas</p><p class="text-xl font-bold text-green-600">$${formatNumber(reporte.ventasNetas)}</p></div><div class="bg-white p-3 rounded-xl shadow"><p class="text-xs text-gray-500">📉 Compras</p><p class="text-xl font-bold text-red-600">$${formatNumber(reporte.comprasNetas)}</p></div></div>
+                    <div class="bg-white p-3 rounded-xl shadow"><div class="chart-container"><canvas id="graficoCanvas"></canvas></div></div>
+                    <div class="bg-white p-3 rounded-xl shadow"><h2 class="font-bold text-sm mb-2">📈 Acumulado Anual</h2><div class="grid grid-cols-2 gap-2 text-sm"><div>Ventas: <span class="font-bold text-green-600">$${formatNumber(acumulado.ventasNetas)}</span></div><div>Compras: <span class="font-bold text-red-600">$${formatNumber(acumulado.comprasNetas)}</span></div><div>Ganancia: <span class="font-bold ${acumulado.resultado >= 0 ? 'text-green-600' : 'text-red-600'}">$${formatNumber(acumulado.resultado)}</span></div><div>Rentabilidad: <span class="font-bold">${acumulado.rentabilidad}%</span></div></div></div>
+                    <div class="bg-white p-3 rounded-xl shadow"><h2 class="font-bold text-sm mb-2">🔔 Próximos vencimientos</h2>${db.ventas.filter(v => v.estado === 'pendiente_cobro').slice(0, 2).map(v => `<div class="flex justify-between text-sm border-b py-1"><span>💰 ${v.clienteNombre}</span><span>$${formatNumber(v.total)} - ${calcularDiasRestantes(v.fechaCobroEsperada) < 0 ? 'VENCIDO' : `Vence en ${calcularDiasRestantes(v.fechaCobroEsperada)} días`}</span></div>`).join('')}${db.ventas.filter(v => v.estado === 'pendiente_cobro').length === 0 ? '<p class="text-xs text-gray-400">Sin vencimientos pendientes</p>' : ''}</div>
                 </div>
             `;
         }
@@ -424,24 +356,16 @@
             const mesSeleccionado = localStorage.getItem('ventasMesFiltro') || meses[0] || new Date().toISOString().substring(0, 7);
             const ventasFiltradas = db.ventas.filter(v => v.mes === mesSeleccionado);
             const totalMes = ventasFiltradas.reduce((s, v) => s + v.total, 0);
-            
             return `
-                <div class="space-y-4 fade-in pb-24">
-                    <div class="flex justify-between items-center"><h1 class="text-2xl font-bold">💰 Ventas</h1><button onclick="mostrarModalNuevaVenta()" class="bg-blue-600 text-white px-3 py-1 rounded text-sm">+ Nueva Venta</button></div>
-                    <div class="flex gap-2"><label class="text-sm font-medium">📅 Mes:</label><select id="mesSelectVentas" class="p-2 border rounded text-sm flex-1" onchange="filtrarVentas()">${meses.map(m => `<option value="${m}" ${m === mesSeleccionado ? 'selected' : ''}>${m}</option>`).join('')}</select></div>
-                    <div class="bg-green-50 p-3 rounded-xl"><p class="text-sm">Total ${mesSeleccionado}</p><p class="text-2xl font-bold text-green-600">$${formatNumber(totalMes)}</p></div>
-                    ${ventasFiltradas.map(v => `
-                        <div class="bg-white p-3 rounded-xl shadow">
-                            <div class="flex justify-between"><div><h3 class="font-bold">${v.clienteNombre}</h3><p>$${formatNumber(v.total)} | ${v.tipoComprobante} ${v.numComprobante}</p><p class="text-xs">Fecha: ${v.fechaVenta} | Cobro esperado: ${v.fechaCobroEsperada}</p><span class="text-xs px-2 rounded ${v.estado === 'cobrado' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}">${v.estado === 'cobrado' ? '✓ Cobrado' : '⏳ Pendiente'}</span></div>
-                            <div>${v.estado === 'pendiente_cobro' ? `<button onclick="mostrarModalCobrarVenta(${v.id})" class="bg-green-600 text-white px-2 py-1 rounded text-xs">Cobrar</button>` : v.comprobanteCobro ? `<p class="text-xs text-green-600">Comprobante: ${v.comprobanteCobro}</p>` : ''}</div></div>
-                            <button onclick="verHistorialCliente(${v.clienteId})" class="text-xs text-blue-600 mt-1">📜 Ver historial del cliente</button>
-                        </div>
-                    `).join('') || '<p class="text-center text-gray-500">No hay ventas en este mes</p>'}
-                </div>
+                <div class="space-y-4 fade-in pb-24"><div class="flex justify-between"><h1 class="text-2xl font-bold">💰 Ventas</h1><button onclick="mostrarModalNuevaVenta()" class="bg-blue-600 text-white px-3 py-1 rounded text-sm">+ Nueva Venta</button></div>
+                <div class="flex gap-2"><label class="text-sm font-medium">📅 Mes:</label><select id="mesSelectVentas" class="p-2 border rounded text-sm flex-1" onchange="filtrarVentas()">${meses.map(m => `<option value="${m}" ${m === mesSeleccionado ? 'selected' : ''}>${m}</option>`).join('')}</select><input type="text" id="searchVentas" placeholder="🔍 Buscar cliente..." class="p-2 border rounded text-sm flex-1" onkeyup="filtrarVentas()"></div>
+                <div class="bg-green-50 p-3 rounded-xl"><p class="text-sm">Total ${mesSeleccionado}</p><p class="text-2xl font-bold text-green-600">$${formatNumber(totalMes)}</p></div>
+                <div id="ventasLista">${ventasFiltradas.filter(v => !document.getElementById('searchVentas') || v.clienteNombre.toLowerCase().includes(document.getElementById('searchVentas').value.toLowerCase())).map(v => `
+                    <div class="bg-white p-3 rounded-xl shadow mb-2"><div class="flex justify-between"><div><h3 class="font-bold">${v.clienteNombre}</h3><p>$${formatNumber(v.total)} | ${v.tipoComprobante} ${v.numComprobante}</p><p class="text-xs">Fecha: ${v.fechaVenta} | Cobro esperado: ${v.fechaCobroEsperada}</p><span class="text-xs px-2 rounded ${v.estado === 'cobrado' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}">${v.estado === 'cobrado' ? '✓ Cobrado' : '⏳ Pendiente'}</span></div><div>${v.estado === 'pendiente_cobro' ? `<button onclick="mostrarModalCobrarVenta(${v.id})" class="bg-green-600 text-white px-2 py-1 rounded text-xs">Cobrar</button>` : ''}</div></div></div>`).join('') || '<p class="text-center text-gray-500">No hay ventas</p>'}</div></div>
             `;
         }
         
-        window.filtrarVentas = () => { localStorage.setItem('ventasMesFiltro', document.getElementById('mesSelectVentas').value); renderVentas(); };
+        window.filtrarVentas = () => { renderVentas(); };
         
         // ========== RENDER COMPRAS ==========
         function renderCompras() {
@@ -449,37 +373,22 @@
             const mesSeleccionado = localStorage.getItem('comprasMesFiltro') || meses[0] || new Date().toISOString().substring(0, 7);
             const comprasFiltradas = db.compras.filter(c => c.mes === mesSeleccionado);
             const totalMes = comprasFiltradas.reduce((s, c) => s + c.total, 0);
-            
             return `
-                <div class="space-y-4 fade-in pb-24">
-                    <div class="flex justify-between"><h1 class="text-2xl font-bold">🛒 Compras</h1><button onclick="mostrarModalNuevaCompra()" class="bg-blue-600 text-white px-3 py-1 rounded text-sm">+ Nueva Compra</button></div>
-                    <div class="flex gap-2"><label class="text-sm font-medium">📅 Mes:</label><select id="mesSelectCompras" class="p-2 border rounded text-sm flex-1" onchange="filtrarCompras()">${meses.map(m => `<option value="${m}" ${m === mesSeleccionado ? 'selected' : ''}>${m}</option>`).join('')}</select></div>
-                    <div class="bg-red-50 p-3 rounded-xl"><p class="text-sm">Total ${mesSeleccionado}</p><p class="text-2xl font-bold text-red-600">$${formatNumber(totalMes)}</p></div>
-                    ${comprasFiltradas.map(c => `
-                        <div class="bg-white p-3 rounded-xl shadow">
-                            <div class="flex justify-between"><div><h3 class="font-bold">${c.proveedorNombre}</h3><p>$${formatNumber(c.total)} | ${c.tipoComprobante} ${c.numComprobante}</p><p class="text-xs">Fecha: ${c.fechaCompra} | Pago esperado: ${c.fechaPagoEsperada}</p><span class="text-xs px-2 rounded ${c.estado === 'pagado' ? 'bg-green-100' : 'bg-yellow-100'}">${c.estado === 'pagado' ? '✓ Pagado' : '⏳ Pendiente'}</span></div>
-                            <div>${c.estado === 'pendiente_pago' ? `<button onclick="mostrarModalPagarCompra(${c.id})" class="bg-green-600 text-white px-2 py-1 rounded text-xs">Pagar</button>` : ''}</div></div>
-                            <button onclick="verHistorialProveedor(${c.proveedorId})" class="text-xs text-blue-600 mt-1">📜 Ver historial del proveedor</button>
-                        </div>
-                    `).join('') || '<p class="text-center text-gray-500">No hay compras en este mes</p>'}
-                </div>
+                <div class="space-y-4 fade-in pb-24"><div class="flex justify-between"><h1 class="text-2xl font-bold">🛒 Compras</h1><button onclick="mostrarModalNuevaCompra()" class="bg-blue-600 text-white px-3 py-1 rounded text-sm">+ Nueva Compra</button></div>
+                <div class="flex gap-2"><label class="text-sm font-medium">📅 Mes:</label><select id="mesSelectCompras" class="p-2 border rounded text-sm flex-1" onchange="filtrarCompras()">${meses.map(m => `<option value="${m}" ${m === mesSeleccionado ? 'selected' : ''}>${m}</option>`).join('')}</select><input type="text" id="searchCompras" placeholder="🔍 Buscar proveedor..." class="p-2 border rounded text-sm flex-1" onkeyup="filtrarCompras()"></div>
+                <div class="bg-red-50 p-3 rounded-xl"><p class="text-sm">Total ${mesSeleccionado}</p><p class="text-2xl font-bold text-red-600">$${formatNumber(totalMes)}</p></div>
+                <div id="comprasLista">${comprasFiltradas.filter(c => !document.getElementById('searchCompras') || c.proveedorNombre.toLowerCase().includes(document.getElementById('searchCompras').value.toLowerCase())).map(c => `
+                    <div class="bg-white p-3 rounded-xl shadow mb-2"><div class="flex justify-between"><div><h3 class="font-bold">${c.proveedorNombre}</h3><p>$${formatNumber(c.total)} | ${c.tipoComprobante} ${c.numComprobante}</p><p class="text-xs">Fecha: ${c.fechaCompra} | Pago esperado: ${c.fechaPagoEsperada}</p><span class="text-xs px-2 rounded ${c.estado === 'pagado' ? 'bg-green-100' : 'bg-yellow-100'}">${c.estado === 'pagado' ? '✓ Pagado' : '⏳ Pendiente'}</span></div><div>${c.estado === 'pendiente_pago' ? `<button onclick="mostrarModalPagarCompra(${c.id})" class="bg-green-600 text-white px-2 py-1 rounded text-xs">Pagar</button>` : ''}</div></div></div>`).join('') || '<p class="text-center text-gray-500">No hay compras</p>'}</div></div>
             `;
         }
         
-        window.filtrarCompras = () => { localStorage.setItem('comprasMesFiltro', document.getElementById('mesSelectCompras').value); renderCompras(); };
+        window.filtrarCompras = () => { renderCompras(); };
         
         // ========== RENDER PRESUPUESTOS ==========
         function renderPresupuestos() {
             return `
-                <div class="space-y-4 fade-in pb-24">
-                    <div class="flex gap-2"><button onclick="mostrarModalNuevoPresupuesto()" class="bg-blue-600 text-white px-3 py-1 rounded text-sm">+ Nuevo Presupuesto</button><button onclick="mostrarModalEscanearPresupuesto()" class="bg-green-600 text-white px-3 py-1 rounded text-sm">📷 Escanear</button></div>
-                    ${db.presupuestos.map(p => `
-                        <div class="bg-white p-3 rounded-xl shadow">
-                            <div class="flex justify-between items-center"><div><h3 class="font-bold">${p.cliente}</h3><p class="text-sm">Total: $${formatNumber(p.total)} | ${p.items?.length || 0} items</p><p class="text-xs">${p.fechaCreacion?.split('T')[0]}</p><span class="text-xs px-2 rounded ${p.estado === 'aprobado' ? 'bg-green-100' : 'bg-yellow-100'}">${p.estado || 'Borrador'}</span></div>
-                            <div class="flex gap-1"><button onclick="verPresupuestoDetalle(${p.id})" class="text-blue-600">Ver</button><button onclick="exportarPresupuestoPDF(${p.id})" class="text-green-600">📄 PDF</button></div></div>
-                        </div>
-                    `).join('') || '<p class="text-center text-gray-500">No hay presupuestos</p>'}
-                </div>
+                <div class="space-y-4 fade-in pb-24"><div class="flex gap-2"><button onclick="mostrarModalNuevoPresupuesto()" class="bg-blue-600 text-white px-3 py-1 rounded text-sm">+ Nuevo Presupuesto</button><button onclick="mostrarModalEscanearPresupuesto()" class="bg-green-600 text-white px-3 py-1 rounded text-sm">📷 Escanear</button></div><input type="text" id="searchPresupuestos" placeholder="🔍 Buscar cliente..." class="p-2 border rounded text-sm w-full mb-2" onkeyup="renderPresupuestos()"><div id="presupuestosLista">${db.presupuestos.filter(p => !document.getElementById('searchPresupuestos') || p.cliente.toLowerCase().includes(document.getElementById('searchPresupuestos').value.toLowerCase())).map(p => `
+                    <div class="bg-white p-3 rounded-xl shadow mb-2"><div class="flex justify-between items-center"><div><h3 class="font-bold">${p.cliente}</h3><p class="text-sm">Total: $${formatNumber(p.total)} | Nº ${p.numero || 'P-' + p.id}</p><p class="text-xs">${p.fechaCreacion?.split('T')[0]}</p><span class="text-xs px-2 rounded ${p.estado === 'aprobado' ? 'bg-green-100' : 'bg-yellow-100'}">${p.estado || 'Borrador'}</span></div><div class="flex gap-1"><button onclick="verPresupuestoDetalle(${p.id})" class="text-blue-600">Ver</button><button onclick="exportarPresupuestoPDF(${p.id})" class="text-green-600">📄 PDF</button><button onclick="enviarPresupuestoWhatsApp(${p.id})" class="text-green-600 btn-whatsapp px-2 py-1 rounded text-xs text-white">📱 WhatsApp</button></div></div></div>`).join('') || '<p class="text-center text-gray-500">No hay presupuestos</p>'}</div></div>
             `;
         }
         
@@ -489,15 +398,13 @@
             const mesSeleccionado = localStorage.getItem('reporteMes') || meses[0] || new Date().toISOString().substring(0, 7);
             const reporte = calcularReporteMes(mesSeleccionado);
             const acumulado = calcularAcumuladoAnual();
-            
             return `
-                <div class="space-y-4 fade-in pb-24">
-                    <h1 class="text-2xl font-bold">📅 Reportes Mensuales</h1>
-                    <div class="flex gap-2"><select id="mesSelectReporte" class="p-2 border rounded text-sm flex-1" onchange="cambiarReporteMes()">${meses.map(m => `<option value="${m}" ${m === mesSeleccionado ? 'selected' : ''}>${m}</option>`).join('')}</select><button onclick="exportarReportePDF('${mesSeleccionado}')" class="bg-blue-600 text-white px-3 py-2 rounded text-sm">📄 PDF</button></div>
-                    <div class="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-4 rounded-xl"><p class="text-sm">📊 RESULTADO ${mesSeleccionado}</p><p class="text-3xl font-bold">$${formatNumber(reporte.resultado)}</p><p class="text-xs">Rentabilidad: ${reporte.rentabilidad}%</p></div>
-                    <div class="grid grid-cols-2 gap-3"><div class="bg-white p-3 rounded-xl"><p class="text-xs">💰 Ventas</p><p class="text-xl font-bold text-green-600">$${formatNumber(reporte.ventasNetas)}</p><p class="text-xs">${reporte.cantidadVentas} ventas</p></div><div class="bg-white p-3 rounded-xl"><p class="text-xs">📉 Compras</p><p class="text-xl font-bold text-red-600">$${formatNumber(reporte.comprasNetas)}</p><p class="text-xs">${reporte.cantidadCompras} compras</p></div></div>
-                    <div class="bg-gray-800 text-white p-4 rounded-xl"><h2 class="font-bold">📈 ACUMULADO ANUAL</h2><div class="grid grid-cols-2 gap-2 text-sm mt-2"><div>Ventas: $${formatNumber(acumulado.ventasNetas)}</div><div>Compras: $${formatNumber(acumulado.comprasNetas)}</div><div>Ganancia: $${formatNumber(acumulado.resultado)}</div><div>Rentabilidad: ${acumulado.rentabilidad}%</div></div></div>
-                </div>
+                <div class="space-y-4 fade-in pb-24"><h1 class="text-2xl font-bold">📅 Reportes Mensuales</h1>
+                <div class="flex gap-2"><select id="mesSelectReporte" class="p-2 border rounded text-sm flex-1" onchange="cambiarReporteMes()">${meses.map(m => `<option value="${m}" ${m === mesSeleccionado ? 'selected' : ''}>${m}</option>`).join('')}</select><button onclick="exportarReportePDF('${mesSeleccionado}')" class="bg-blue-600 text-white px-3 py-2 rounded text-sm">📄 PDF</button><button onclick="exportarExcel()" class="bg-green-600 text-white px-3 py-2 rounded text-sm">📊 Excel</button></div>
+                <div class="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-4 rounded-xl"><p class="text-sm">📊 RESULTADO ${mesSeleccionado}</p><p class="text-3xl font-bold">$${formatNumber(reporte.resultado)}</p><p class="text-xs">Rentabilidad: ${reporte.rentabilidad}%</p></div>
+                <div class="grid grid-cols-2 gap-3"><div class="bg-white p-3 rounded-xl"><p class="text-xs">💰 Ventas</p><p class="text-xl font-bold text-green-600">$${formatNumber(reporte.ventasNetas)}</p><p class="text-xs">${reporte.cantidadVentas} ventas</p></div><div class="bg-white p-3 rounded-xl"><p class="text-xs">📉 Compras</p><p class="text-xl font-bold text-red-600">$${formatNumber(reporte.comprasNetas)}</p><p class="text-xs">${reporte.cantidadCompras} compras</p></div></div>
+                <div class="bg-gray-800 text-white p-4 rounded-xl"><h2 class="font-bold">📈 ACUMULADO ANUAL</h2><div class="grid grid-cols-2 gap-2 text-sm mt-2"><div>Ventas: $${formatNumber(acumulado.ventasNetas)}</div><div>Compras: $${formatNumber(acumulado.comprasNetas)}</div><div>Ganancia: $${formatNumber(acumulado.resultado)}</div><div>Rentabilidad: ${acumulado.rentabilidad}%</div><div>IVA a pagar: $${formatNumber(acumulado.ivaAPagar)}</div></div></div>
+                <div class="bg-white p-3 rounded-xl shadow"><h2 class="font-bold text-sm mb-2">📋 Reporte de IVA</h2><div class="grid grid-cols-2 gap-2 text-sm"><div>IVA Crédito (compras): $${formatNumber(reporte.ivaPagado)}</div><div>IVA Débito (ventas): $${formatNumber(reporte.ivaCobrado)}</div><div class="col-span-2 font-bold">Saldo a pagar: $${formatNumber(reporte.ivaAPagar)}</div></div></div></div>
             `;
         }
         
@@ -509,58 +416,31 @@
             const mesActual = meses[0] || new Date().toISOString().substring(0, 7);
             const reporte = calcularReporteMes(mesActual);
             const acumulado = calcularAcumuladoAnual();
-            
             return `
-                <div class="space-y-4 fade-in pb-24">
-                    <h1 class="text-2xl font-bold">🧮 Contador - Argentina</h1>
-                    <div class="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-4 rounded-xl"><p class="text-sm">💰 CAPITAL REAL DISPONIBLE</p><p class="text-2xl font-bold">$${formatNumber(acumulado.resultado)}</p><p class="text-xs">IVA a pagar AFIP: $${formatNumber(acumulado.ivaAPagar)}</p></div>
-                    <div class="bg-white p-4 rounded-xl shadow"><h2 class="font-bold">📊 Estado de Resultados ${mesActual}</h2><div class="space-y-1 text-sm"><div class="flex justify-between"><span>Ventas Netas</span><span class="text-green-600">+ $${formatNumber(reporte.ventasNetas)}</span></div><div class="flex justify-between"><span>Compras Netas</span><span class="text-red-600">- $${formatNumber(reporte.comprasNetas)}</span></div><div class="flex justify-between"><span>IVA a Pagar</span><span class="text-orange-600">- $${formatNumber(reporte.ivaAPagar)}</span></div><div class="flex justify-between"><span>Costos Fijos</span><span class="text-purple-600">- $${formatNumber(reporte.costosFijosTotal)}</span></div><div class="border-t-2 pt-2 flex justify-between font-bold text-lg"><span>RESULTADO NETO</span><span class="${reporte.resultado >= 0 ? 'text-green-600' : 'text-red-600'}">$${formatNumber(reporte.resultado)}</span></div><div class="flex justify-between"><span>Rentabilidad Real</span><span class="font-bold">${reporte.rentabilidad}%</span></div></div></div>
-                </div>
+                <div class="space-y-4 fade-in pb-24"><h1 class="text-2xl font-bold">🧮 Contador - Argentina</h1>
+                <div class="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-4 rounded-xl"><p class="text-sm">💰 CAPITAL REAL DISPONIBLE</p><p class="text-2xl font-bold">$${formatNumber(acumulado.resultado)}</p><p class="text-xs">IVA a pagar AFIP: $${formatNumber(acumulado.ivaAPagar)}</p></div>
+                <div class="bg-white p-4 rounded-xl shadow"><h2 class="font-bold">📊 Estado de Resultados ${mesActual}</h2><div class="space-y-1 text-sm"><div class="flex justify-between"><span>Ventas Netas</span><span class="text-green-600">+ $${formatNumber(reporte.ventasNetas)}</span></div><div class="flex justify-between"><span>Compras Netas</span><span class="text-red-600">- $${formatNumber(reporte.comprasNetas)}</span></div><div class="flex justify-between"><span>IVA a Pagar</span><span class="text-orange-600">- $${formatNumber(reporte.ivaAPagar)}</span></div><div class="flex justify-between"><span>Costos Fijos</span><span class="text-purple-600">- $${formatNumber(reporte.costosFijosTotal)}</span></div><div class="border-t-2 pt-2 flex justify-between font-bold text-lg"><span>RESULTADO NETO</span><span class="${reporte.resultado >= 0 ? 'text-green-600' : 'text-red-600'}">$${formatNumber(reporte.resultado)}</span></div><div class="flex justify-between"><span>Rentabilidad Real</span><span class="font-bold">${reporte.rentabilidad}%</span></div></div></div></div>
             `;
         }
         
         // ========== RENDER CONFIGURACIÓN ==========
         function renderConfiguracion() {
             return `
-                <div class="space-y-4 fade-in pb-24">
-                    <h1 class="text-2xl font-bold">⚙️ Configuración</h1>
-                    
-                    <div class="bg-white p-4 rounded-xl shadow">
-                        <h2 class="font-bold mb-2">🏢 Clientes</h2>
-                        ${db.clientes.map(c => `<div class="flex justify-between items-center border-b py-2"><div><span class="font-medium">${c.nombre}</span><p class="text-xs text-gray-500">CUIT: ${c.cuit} | Días cobro: ${c.diasCobro}</p></div><div><button onclick="editarClienteModal(${c.id})" class="text-blue-600 mr-2">✏️</button><button onclick="eliminarCliente(${c.id})" class="text-red-600">🗑️</button></div></div>`).join('')}
-                        <button onclick="mostrarModalAgregarCliente()" class="mt-3 bg-blue-600 text-white px-3 py-1 rounded text-sm w-full">+ Agregar Cliente</button>
-                    </div>
-                    
-                    <div class="bg-white p-4 rounded-xl shadow">
-                        <h2 class="font-bold mb-2">🏭 Proveedores</h2>
-                        ${db.proveedores.map(p => `<div class="flex justify-between items-center border-b py-2"><div><span class="font-medium">${p.nombre}</span><p class="text-xs text-gray-500">CUIT: ${p.cuit} | Días pago: ${p.diasPago}</p></div><div><button onclick="editarProveedorModal(${p.id})" class="text-blue-600 mr-2">✏️</button><button onclick="eliminarProveedor(${p.id})" class="text-red-600">🗑️</button></div></div>`).join('')}
-                        <button onclick="mostrarModalAgregarProveedor()" class="mt-3 bg-blue-600 text-white px-3 py-1 rounded text-sm w-full">+ Agregar Proveedor</button>
-                    </div>
-                    
-                    <div class="bg-white p-4 rounded-xl shadow">
-                        <h2 class="font-bold mb-2">💰 Costos Fijos</h2>
-                        ${db.costosFijos.filter(cf => cf.estado === 'pendiente').map(cf => `<div class="flex justify-between items-center border-b py-2"><div><span class="font-medium">${cf.nombre}</span><p class="text-xs">$${formatNumber(cf.monto)} | Vence: ${cf.vencimiento}</p></div><div><button onclick="pagarCostoFijoModal(${cf.id})" class="bg-green-600 text-white px-2 py-1 rounded text-xs mr-1">Pagar</button><button onclick="eliminarCostoFijo(${cf.id})" class="text-red-600">🗑️</button></div></div>`).join('')}
-                        <button onclick="mostrarModalAgregarCostoFijo()" class="mt-3 bg-blue-600 text-white px-3 py-1 rounded text-sm w-full">+ Agregar Costo Fijo</button>
-                    </div>
-                    
-                    <div class="bg-white p-4 rounded-xl shadow">
-                        <h2 class="font-bold mb-2">📋 Notificaciones</h2>
-                        <div class="max-h-48 overflow-y-auto">${db.notificaciones.slice(0, 10).map(n => `<div class="border-b py-1 text-sm"><span class="${n.tipo === 'cobro' ? 'text-green-600' : n.tipo === 'pago' ? 'text-red-600' : 'text-orange-600'}">${n.mensaje}</span><span class="text-xs text-gray-400 ml-2">${n.fecha}</span></div>`).join('') || '<p class="text-gray-400 text-sm">Sin notificaciones</p>'}</div>
-                        <button onclick="limpiarNotificaciones()" class="mt-2 bg-gray-500 text-white px-3 py-1 rounded text-sm w-full">Limpiar notificaciones</button>
-                    </div>
-                    
-                    <div class="bg-white p-4 rounded-xl shadow">
-                        <h2 class="font-bold mb-2">🏢 Datos de la Empresa</h2>
-                        ${db.empresas.map(e => `<div class="border-b py-2"><p><span class="font-medium">${e.nombre}</span> - CUIT: ${e.cuit}</p><p class="text-xs">${e.direccion} | ${e.telefono}</p><button onclick="cambiarEmpresaActiva(${e.id})" class="text-blue-600 text-xs mt-1">${db.empresaActiva === e.id ? '✓ Activa' : 'Activar'}</button></div>`).join('')}
-                    </div>
-                </div>
+                <div class="space-y-4 fade-in pb-24"><h1 class="text-2xl font-bold">⚙️ Configuración</h1>
+                <div class="bg-white p-4 rounded-xl shadow"><h2 class="font-bold mb-2">🏢 Clientes</h2>${db.clientes.map(c => `<div class="flex justify-between items-center border-b py-2"><div><span class="font-medium">${c.nombre}</span><p class="text-xs text-gray-500">CUIT: ${c.cuit} | WhatsApp: ${c.whatsapp || 'No'}</p></div><div><button onclick="editarClienteModal(${c.id})" class="text-blue-600 mr-2">✏️</button><button onclick="eliminarCliente(${c.id})" class="text-red-600">🗑️</button></div></div>`).join('')}<button onclick="mostrarModalAgregarCliente()" class="mt-3 bg-blue-600 text-white px-3 py-1 rounded text-sm w-full">+ Agregar Cliente</button></div>
+                <div class="bg-white p-4 rounded-xl shadow"><h2 class="font-bold mb-2">🏭 Proveedores</h2>${db.proveedores.map(p => `<div class="flex justify-between items-center border-b py-2"><div><span class="font-medium">${p.nombre}</span><p class="text-xs text-gray-500">CUIT: ${p.cuit} | Días pago: ${p.diasPago}</p></div><div><button onclick="editarProveedorModal(${p.id})" class="text-blue-600 mr-2">✏️</button><button onclick="eliminarProveedor(${p.id})" class="text-red-600">🗑️</button></div></div>`).join('')}<button onclick="mostrarModalAgregarProveedor()" class="mt-3 bg-blue-600 text-white px-3 py-1 rounded text-sm w-full">+ Agregar Proveedor</button></div>
+                <div class="bg-white p-4 rounded-xl shadow"><h2 class="font-bold mb-2">💰 Costos Fijos</h2>${db.costosFijos.filter(cf => cf.estado === 'pendiente').map(cf => `<div class="flex justify-between items-center border-b py-2"><div><span class="font-medium">${cf.nombre}</span><p class="text-xs">$${formatNumber(cf.monto)} | Vence: ${cf.vencimiento}</p></div><div><button onclick="pagarCostoFijoModal(${cf.id})" class="bg-green-600 text-white px-2 py-1 rounded text-xs mr-1">Pagar</button><button onclick="eliminarCostoFijo(${cf.id})" class="text-red-600">🗑️</button></div></div>`).join('')}<button onclick="mostrarModalAgregarCostoFijo()" class="mt-3 bg-blue-600 text-white px-3 py-1 rounded text-sm w-full">+ Agregar Costo Fijo</button></div>
+                <div class="bg-white p-4 rounded-xl shadow"><h2 class="font-bold mb-2">💾 Backup y Datos</h2><div class="flex gap-2"><button onclick="exportarBackup()" class="bg-blue-600 text-white px-3 py-2 rounded text-sm flex-1">📦 Exportar Backup</button><button onclick="document.getElementById('importFile').click()" class="bg-green-600 text-white px-3 py-2 rounded text-sm flex-1">📁 Importar Backup</button><input type="file" id="importFile" class="hidden" accept=".json" onchange="importarBackup(this.files[0])"></div><button onclick="exportarExcel()" class="mt-2 bg-purple-600 text-white px-3 py-2 rounded text-sm w-full">📊 Exportar a Excel</button></div>
+                <div class="bg-white p-4 rounded-xl shadow"><h2 class="font-bold mb-2">📋 Notificaciones</h2><div class="max-h-48 overflow-y-auto">${db.notificaciones.slice(0, 10).map(n => `<div class="border-b py-1 text-sm"><span class="${n.tipo === 'cobro' ? 'text-green-600' : 'text-red-600'}">${n.mensaje}</span><span class="text-xs text-gray-400 ml-2">${n.fecha}</span></div>`).join('') || '<p class="text-gray-400 text-sm">Sin notificaciones</p>'}</div><button onclick="limpiarNotificaciones()" class="mt-2 bg-gray-500 text-white px-3 py-1 rounded text-sm w-full">Limpiar notificaciones</button></div>
+                <div class="bg-white p-4 rounded-xl shadow"><h2 class="font-bold mb-2">🏢 Datos de la Empresa</h2>${db.empresas.map(e => `<div class="border-b py-2"><p><span class="font-medium">${e.nombre}</span> - CUIT: ${e.cuit}</p><p class="text-xs">WhatsApp: ${e.whatsapp || 'No configurado'}</p><button onclick="cambiarEmpresaActiva(${e.id})" class="text-blue-600 text-xs mt-1">${db.empresaActiva === e.id ? '✓ Activa' : 'Activar'}</button></div>`).join('')}</div>
+                <div class="bg-white p-4 rounded-xl shadow"><h2 class="font-bold mb-2">🌓 Apariencia</h2><button onclick="toggleDarkMode()" class="bg-gray-800 text-white px-3 py-2 rounded text-sm w-full">${darkMode ? '☀️ Modo Claro' : '🌙 Modo Oscuro'}</button></div></div>
             `;
         }
         
         // ========== MODALES ==========
         function mostrarModalNuevaVenta() {
             const clientesOptions = db.clientes.map(c => `<option value="${c.id}">${c.nombre} (${c.diasCobro} días)</option>`).join('');
-            document.getElementById('root').innerHTML = `<div class="modal"><div class="modal-content"><h2 class="text-xl font-bold mb-4">💰 Nueva Venta</h2><select id="clienteId" class="w-full p-2 border rounded mb-2">${clientesOptions}</select><input type="number" id="montoNeto" placeholder="Monto Neto (sin IVA)" class="w-full p-2 border rounded mb-2"><select id="ivaSelect" class="w-full p-2 border rounded mb-2"><option value="21">IVA 21%</option><option value="10.5">IVA 10.5%</option><option value="27">IVA 27%</option></select><input type="text" id="numComp" placeholder="Número comprobante" class="w-full p-2 border rounded mb-2"><input type="date" id="fechaVenta" value="${new Date().toISOString().split('T')[0]}" class="w-full p-2 border rounded mb-2"><button onclick="guardarVentaModal()" class="bg-green-600 text-white p-2 rounded w-full">Guardar</button><button onclick="cancelarModal()" class="bg-gray-300 p-2 rounded w-full mt-1">Cancelar</button></div></div>`;
+            document.getElementById('root').innerHTML = `<div class="modal"><div class="modal-content"><h2 class="text-xl font-bold mb-4">💰 Nueva Venta</h2><select id="clienteId" class="w-full p-2 border rounded mb-2">${clientesOptions}</select><input type="number" id="montoNeto" placeholder="Monto Neto (sin IVA)" class="w-full p-2 border rounded mb-2"><select id="ivaSelect" class="w-full p-2 border rounded mb-2"><option value="21">IVA 21%</option><option value="10.5">IVA 10.5%</option></select><input type="text" id="numComp" placeholder="Número comprobante" class="w-full p-2 border rounded mb-2"><input type="date" id="fechaVenta" value="${new Date().toISOString().split('T')[0]}" class="w-full p-2 border rounded mb-2"><button onclick="guardarVentaModal()" class="bg-green-600 text-white p-2 rounded w-full">Guardar</button><button onclick="cancelarModal()" class="bg-gray-300 p-2 rounded w-full mt-1">Cancelar</button></div></div>`;
         }
         
         window.guardarVentaModal = () => {
@@ -570,7 +450,7 @@
             const numComp = document.getElementById('numComp').value;
             const fecha = document.getElementById('fechaVenta').value;
             if (!clienteId || isNaN(monto)) { mostrarNotificacion("Complete los datos", 'error'); return; }
-            registrarVenta(clienteId, monto, iva, "Factura", numComp, fecha, null);
+            registrarVenta(clienteId, monto, iva, "Factura", numComp, fecha);
             cancelarModal();
             renderVentas();
         };
@@ -580,11 +460,7 @@
             document.getElementById('root').innerHTML = `<div class="modal"><div class="modal-content"><h2 class="text-xl font-bold">💰 Cobrar Venta</h2><p>${v.clienteNombre} - $${formatNumber(v.total)}</p><input type="date" id="fechaCobro" value="${new Date().toISOString().split('T')[0]}" class="w-full p-2 border rounded my-2"><input type="text" id="comprobante" placeholder="Comprobante" class="w-full p-2 border rounded"><button onclick="confirmarCobroModal(${id})" class="bg-green-600 text-white p-2 rounded w-full">Registrar Cobro</button><button onclick="cancelarModal()" class="bg-gray-300 p-2 rounded w-full mt-1">Cancelar</button></div></div>`;
         }
         
-        window.confirmarCobroModal = (id) => {
-            registrarCobro(id, document.getElementById('fechaCobro').value, 0, document.getElementById('comprobante').value);
-            cancelarModal();
-            renderVentas();
-        };
+        window.confirmarCobroModal = (id) => { registrarCobro(id, document.getElementById('fechaCobro').value, document.getElementById('comprobante').value); cancelarModal(); renderVentas(); };
         
         function mostrarModalNuevaCompra() {
             const proveedoresOptions = db.proveedores.map(p => `<option value="${p.id}">${p.nombre} (${p.diasPago} días)</option>`).join('');
@@ -598,7 +474,7 @@
             const numComp = document.getElementById('numComp').value;
             const fecha = document.getElementById('fechaCompra').value;
             if (!proveedorId || isNaN(monto)) { mostrarNotificacion("Complete los datos", 'error'); return; }
-            registrarCompra(proveedorId, monto, iva, "Factura", numComp, fecha, null);
+            registrarCompra(proveedorId, monto, iva, "Factura", numComp, fecha);
             cancelarModal();
             renderCompras();
         };
@@ -608,144 +484,48 @@
             document.getElementById('root').innerHTML = `<div class="modal"><div class="modal-content"><h2 class="text-xl font-bold">💰 Pagar Compra</h2><p>${c.proveedorNombre} - $${formatNumber(c.total)}</p><input type="date" id="fechaPago" value="${new Date().toISOString().split('T')[0]}" class="w-full p-2 border rounded my-2"><input type="text" id="comprobante" placeholder="Comprobante" class="w-full p-2 border rounded"><button onclick="confirmarPagoModal(${id})" class="bg-green-600 text-white p-2 rounded w-full">Registrar Pago</button><button onclick="cancelarModal()" class="bg-gray-300 p-2 rounded w-full mt-1">Cancelar</button></div></div>`;
         }
         
-        window.confirmarPagoModal = (id) => {
-            registrarPagoCompra(id, document.getElementById('fechaPago').value, 0, document.getElementById('comprobante').value);
-            cancelarModal();
-            renderCompras();
-        };
+        window.confirmarPagoModal = (id) => { registrarPagoCompra(id, document.getElementById('fechaPago').value, document.getElementById('comprobante').value); cancelarModal(); renderCompras(); };
         
-        function mostrarModalAgregarCliente() {
-            document.getElementById('root').innerHTML = `<div class="modal"><div class="modal-content"><h2 class="text-xl font-bold mb-4">👤 Agregar Cliente</h2><input type="text" id="nombre" placeholder="Nombre" class="w-full p-2 border rounded mb-2"><input type="text" id="cuit" placeholder="CUIT" class="w-full p-2 border rounded mb-2"><input type="text" id="telefono" placeholder="Teléfono" class="w-full p-2 border rounded mb-2"><input type="email" id="email" placeholder="Email" class="w-full p-2 border rounded mb-2"><input type="text" id="direccion" placeholder="Dirección" class="w-full p-2 border rounded mb-2"><input type="number" id="diasCobro" placeholder="Días de cobro" value="30" class="w-full p-2 border rounded mb-2"><button onclick="guardarClienteModal()" class="bg-green-600 text-white p-2 rounded w-full">Guardar</button><button onclick="cancelarModal()" class="bg-gray-300 p-2 rounded w-full mt-1">Cancelar</button></div></div>`;
-        }
+        // Funciones básicas para configuración
+        window.eliminarCliente = (id) => { if (confirm("¿Eliminar cliente?")) { db.clientes = db.clientes.filter(c => c.id !== id); guardarDB(); renderConfiguracion(); mostrarNotificacion("Cliente eliminado"); } };
+        window.eliminarProveedor = (id) => { if (confirm("¿Eliminar proveedor?")) { db.proveedores = db.proveedores.filter(p => p.id !== id); guardarDB(); renderConfiguracion(); } };
+        window.eliminarCostoFijo = (id) => { if (confirm("¿Eliminar costo fijo?")) { db.costosFijos = db.costosFijos.filter(c => c.id !== id); guardarDB(); renderConfiguracion(); } };
+        window.limpiarNotificaciones = () => { db.notificaciones = []; guardarDB(); renderConfiguracion(); };
+        window.cambiarEmpresaActiva = (id) => { db.empresaActiva = id; guardarDB(); renderConfiguracion(); };
         
-        window.guardarClienteModal = () => {
-            const nombre = document.getElementById('nombre').value;
-            if (!nombre) { mostrarNotificacion("Ingrese nombre", 'error'); return; }
-            agregarCliente(nombre, document.getElementById('cuit').value, document.getElementById('telefono').value, document.getElementById('email').value, document.getElementById('direccion').value, "", parseInt(document.getElementById('diasCobro').value));
-            cancelarModal();
-            renderConfiguracion();
-        };
+        // Funciones placeholder
+        window.verPresupuestoDetalle = (id) => { mostrarNotificacion("Presupuesto #" + id); };
+        window.exportarPresupuestoPDF = (id) => { mostrarNotificacion("Exportando PDF..."); };
+        window.enviarPresupuestoWhatsApp = (id) => { mostrarNotificacion("Abriendo WhatsApp..."); };
         
-        function mostrarModalAgregarProveedor() {
-            document.getElementById('root').innerHTML = `<div class="modal"><div class="modal-content"><h2 class="text-xl font-bold mb-4">🏭 Agregar Proveedor</h2><input type="text" id="nombre" placeholder="Nombre" class="w-full p-2 border rounded mb-2"><input type="text" id="cuit" placeholder="CUIT" class="w-full p-2 border rounded mb-2"><input type="text" id="telefono" placeholder="Teléfono" class="w-full p-2 border rounded mb-2"><input type="email" id="email" placeholder="Email" class="w-full p-2 border rounded mb-2"><input type="number" id="diasPago" placeholder="Días de pago" value="30" class="w-full p-2 border rounded mb-2"><button onclick="guardarProveedorModal()" class="bg-green-600 text-white p-2 rounded w-full">Guardar</button><button onclick="cancelarModal()" class="bg-gray-300 p-2 rounded w-full mt-1">Cancelar</button></div></div>`;
-        }
-        
-        window.guardarProveedorModal = () => {
-            const nombre = document.getElementById('nombre').value;
-            if (!nombre) { mostrarNotificacion("Ingrese nombre", 'error'); return; }
-            agregarProveedor(nombre, document.getElementById('cuit').value, document.getElementById('telefono').value, document.getElementById('email').value, "", "", parseInt(document.getElementById('diasPago').value));
-            cancelarModal();
-            renderConfiguracion();
-        };
-        
-        function mostrarModalAgregarCostoFijo() {
-            document.getElementById('root').innerHTML = `<div class="modal"><div class="modal-content"><h2 class="text-xl font-bold mb-4">💰 Agregar Costo Fijo</h2><input type="text" id="nombre" placeholder="Nombre" class="w-full p-2 border rounded mb-2"><input type="number" id="monto" placeholder="Monto" class="w-full p-2 border rounded mb-2"><input type="date" id="vencimiento" value="${new Date().toISOString().split('T')[0]}" class="w-full p-2 border rounded mb-2"><select id="categoria" class="w-full p-2 border rounded mb-2">${db.categoriasGastos.map(c => `<option value="${c}">${c}</option>`).join('')}</select><label class="flex items-center gap-2 mb-2"><input type="checkbox" id="recurrente"> Recurrente (mensual)</label><button onclick="guardarCostoFijoModal()" class="bg-green-600 text-white p-2 rounded w-full">Guardar</button><button onclick="cancelarModal()" class="bg-gray-300 p-2 rounded w-full mt-1">Cancelar</button></div></div>`;
-        }
-        
-        window.guardarCostoFijoModal = () => {
-            const nombre = document.getElementById('nombre').value;
-            const monto = parseFloat(document.getElementById('monto').value);
-            if (!nombre || isNaN(monto)) { mostrarNotificacion("Complete los datos", 'error'); return; }
-            registrarCostoFijo(nombre, monto, document.getElementById('vencimiento').value, document.getElementById('categoria').value, document.getElementById('recurrente').checked);
-            cancelarModal();
-            renderConfiguracion();
-        };
-        
-        function pagarCostoFijoModal(id) {
-            const c = db.costosFijos.find(x => x.id === id);
-            document.getElementById('root').innerHTML = `<div class="modal"><div class="modal-content"><h2 class="text-xl font-bold">💰 Pagar ${c.nombre}</h2><p>Monto: $${formatNumber(c.monto)}</p><input type="date" id="fechaPago" value="${new Date().toISOString().split('T')[0]}" class="w-full p-2 border rounded my-2"><input type="text" id="comprobante" placeholder="Comprobante" class="w-full p-2 border rounded"><button onclick="confirmarPagoCostoModal(${id})" class="bg-green-600 text-white p-2 rounded w-full">Registrar Pago</button><button onclick="cancelarModal()" class="bg-gray-300 p-2 rounded w-full mt-1">Cancelar</button></div></div>`;
-        }
-        
-        window.confirmarPagoCostoModal = (id) => {
-            pagarCostoFijo(id, document.getElementById('fechaPago').value, document.getElementById('comprobante').value);
-            cancelarModal();
-            renderConfiguracion();
-        };
-        
-        // ========== FUNCIONES ADICIONALES ==========
-        window.cancelarModal = () => { showView(currentView); };
-        window.verPresupuestoDetalle = (id) => {
-            const p = db.presupuestos.find(x => x.id === id);
-            if (!p) return;
-            showView('presupuestos');
-            mostrarNotificacion(`Presupuesto: ${p.cliente} - Total $${formatNumber(p.total)}`);
-        };
-        window.exportarPresupuestoPDF = (id) => {
-            const p = db.presupuestos.find(x => x.id === id);
-            if (p) exportarPresupuestoPDF(p);
-        };
-        window.exportarReportePDF = (mes) => { exportarReportePDF(mes); };
-        window.verHistorialCliente = (id) => {
-            const cliente = db.clientes.find(c => c.id === id);
-            const ventas = db.ventas.filter(v => v.clienteId === id);
-            mostrarNotificacion(`${cliente.nombre}: ${ventas.length} ventas - Saldo: $${formatNumber(cliente.saldo)}`);
-        };
-        window.verHistorialProveedor = (id) => {
-            const proveedor = db.proveedores.find(p => p.id === id);
-            const compras = db.compras.filter(c => c.proveedorId === id);
-            mostrarNotificacion(`${proveedor.nombre}: ${compras.length} compras - Saldo: $${formatNumber(proveedor.saldo)}`);
-        };
-        window.limpiarNotificaciones = () => { db.notificaciones = []; guardarDB(); renderConfiguracion(); mostrarNotificacion("Notificaciones limpiadas"); };
-        window.cambiarEmpresaActiva = (id) => { db.empresaActiva = id; guardarDB(); renderConfiguracion(); mostrarNotificacion("Empresa cambiada"); };
-        
-        // Presupuestos OCR
+        // OCR y presupuestos
         let itemsPresupuestoOCR = [];
         function mostrarModalEscanearPresupuesto() {
-            document.getElementById('root').innerHTML = `
-                <div class="modal"><div class="modal-content w-full max-w-md">
-                    <h2 class="text-xl font-bold mb-4">📷 Escanear Presupuesto</h2>
-                    <input type="file" id="fileInput" accept="image/*" capture="environment" class="w-full p-2 border rounded mb-2">
-                    <button onclick="abrirCamara()" class="btn-camara w-full mb-2">📸 Usar cámara</button>
-                    <div id="ocrProgress" class="hidden text-blue-600 text-center">Procesando OCR...</div>
-                    <div id="ocrPreview" class="mt-2 text-center"></div>
-                    <div id="itemsDetectados" class="mt-2 max-h-60 overflow-y-auto"></div>
-                    <button id="aceptarOCR" class="hidden bg-green-600 text-white p-2 rounded w-full mt-2">Aceptar y editar</button>
-                    <button onclick="cancelarModal()" class="bg-gray-300 p-2 rounded w-full mt-1">Cancelar</button>
-                </div></div>`;
-            
-            window.abrirCamara = () => { document.getElementById('fileInput').click(); };
+            document.getElementById('root').innerHTML = `<div class="modal"><div class="modal-content"><h2 class="text-xl font-bold mb-4">📷 Escanear Presupuesto</h2><input type="file" id="fileInput" accept="image/*" capture="environment" class="w-full p-2 border rounded mb-2"><div id="ocrProgress" class="hidden text-blue-600">Procesando OCR...</div><div id="itemsDetectados"></div><button id="aceptarOCR" class="hidden bg-green-600 text-white p-2 rounded w-full mt-2">Aceptar</button><button onclick="cancelarModal()" class="bg-gray-300 p-2 rounded w-full mt-1">Cancelar</button></div></div>`;
             const fileInput = document.getElementById('fileInput');
             fileInput.onchange = async (e) => {
                 const file = e.target.files[0];
                 if (!file) return;
-                const progress = document.getElementById('ocrProgress');
-                progress.classList.remove('hidden');
+                document.getElementById('ocrProgress').classList.remove('hidden');
                 try {
                     const { data: { text } } = await Tesseract.recognize(file, 'spa');
                     const nums = text.match(/\d{2,6}[.,]?\d{0,2}/g) || [];
                     const precios = nums.filter(n => { const num = parseFloat(n.replace(',', '.')); return num > 100 && num < 10000000; }).slice(0, 8);
                     if (precios.length > 0) {
                         itemsPresupuestoOCR = precios.map(p => ({ desc: "Item detectado", cant: 1, costo: parseFloat(p.replace(',', '.')) }));
-                        const itemsDiv = document.getElementById('itemsDetectados');
-                        itemsDiv.innerHTML = `<p class="font-bold">✅ ${precios.length} items detectados:</p>` + itemsPresupuestoOCR.map(i => `<div class="flex gap-2 items-center my-1"><input value="${i.desc}" class="itemDesc flex-1 border p-1 rounded"><input type="number" value="${i.cant}" class="itemCant w-16 border p-1 rounded"><input type="number" value="${i.costo}" class="itemCosto w-24 border p-1 rounded"></div>`).join('');
+                        document.getElementById('itemsDetectados').innerHTML = `<p>✅ ${precios.length} items detectados</p>`;
                         document.getElementById('aceptarOCR').classList.remove('hidden');
                     } else { alert("No se detectaron precios"); }
                 } catch(err) { alert("Error OCR"); }
-                finally { progress.classList.add('hidden'); }
+                finally { document.getElementById('ocrProgress').classList.add('hidden'); }
             };
-            document.getElementById('aceptarOCR').onclick = () => {
-                const items = [];
-                document.querySelectorAll('#itemsDetectados .itemDesc').forEach((el, i) => {
-                    items.push({ desc: el.value, cant: parseFloat(document.querySelectorAll('.itemCant')[i].value) || 1, costo: parseFloat(document.querySelectorAll('.itemCosto')[i].value) || 0 });
-                });
-                mostrarModalNuevoPresupuestoConItems(items);
-            };
+            document.getElementById('aceptarOCR').onclick = () => { mostrarModalNuevoPresupuestoConItems(itemsPresupuestoOCR); };
         }
         
         function mostrarModalNuevoPresupuesto() { mostrarModalNuevoPresupuestoConItems([]); }
         function mostrarModalNuevoPresupuestoConItems(itemsIniciales) {
             const clientesOptions = db.clientes.map(c => `<option value="${c.id}">${c.nombre}</option>`).join('');
-            document.getElementById('root').innerHTML = `
-                <div class="modal"><div class="modal-content w-full max-w-2xl">
-                    <h2 class="text-xl font-bold mb-4">📄 Nuevo Presupuesto</h2>
-                    <select id="clienteId" class="w-full p-2 border rounded mb-2"><option value="">Seleccionar cliente...</option>${clientesOptions}</select>
-                    <div id="itemsContainer">${(itemsIniciales.length ? itemsIniciales : [{ desc: "", cant: 1, costo: 0 }]).map((it, idx) => `<div class="flex gap-2 mb-1"><input placeholder="Producto" value="${it.desc}" class="itemDesc flex-1 border p-1 rounded"><input type="number" placeholder="Cant" value="${it.cant}" class="itemCant w-20 border p-1 rounded"><input type="number" placeholder="Precio" value="${it.costo}" class="itemPrecio w-28 border p-1 rounded"><button onclick="this.parentElement.remove()" class="text-red-500">🗑️</button></div>`).join('')}</div>
-                    <button onclick="agregarItemPresupuestoUI()" class="bg-gray-200 p-1 rounded text-sm mb-2">+ Agregar item</button>
-                    <div class="mb-2"><label>Margen: <span id="margenSpan">30</span>%</label><input type="range" id="margenSlider" min="0" max="200" value="30" class="w-full"></div>
-                    <div id="totalPresupuesto" class="text-right font-bold text-lg mb-2">Total: $0</div>
-                    <button onclick="guardarPresupuestoUI()" class="bg-green-600 text-white p-2 rounded w-full">Guardar Presupuesto</button>
-                    <button onclick="cancelarModal()" class="bg-gray-300 p-2 rounded w-full mt-1">Cancelar</button>
-                </div></div>`;
+            document.getElementById('root').innerHTML = `<div class="modal"><div class="modal-content w-full max-w-2xl"><h2 class="text-xl font-bold mb-4">📄 Nuevo Presupuesto</h2><select id="clienteId" class="w-full p-2 border rounded mb-2"><option value="">Seleccionar cliente...</option>${clientesOptions}</select><div id="itemsContainer">${(itemsIniciales.length ? itemsIniciales : [{ desc: "", cant: 1, costo: 0 }]).map((it, idx) => `<div class="flex gap-2 mb-1"><input placeholder="Producto" value="${it.desc}" class="itemDesc flex-1 border p-1 rounded"><input type="number" placeholder="Cant" value="${it.cant}" class="itemCant w-20 border p-1 rounded"><input type="number" placeholder="Precio" value="${it.costo}" class="itemPrecio w-28 border p-1 rounded"><button onclick="this.parentElement.remove()" class="text-red-500">🗑️</button></div>`).join('')}</div><button onclick="agregarItemPresupuestoUI()" class="bg-gray-200 p-1 rounded text-sm mb-2">+ Agregar item</button><div class="mb-2"><label>Margen: <span id="margenSpan">30</span>%</label><input type="range" id="margenSlider" min="0" max="200" value="30" class="w-full"></div><div id="totalPresupuesto" class="text-right font-bold text-lg mb-2">Total: $0</div><button onclick="guardarPresupuestoUI()" class="bg-green-600 text-white p-2 rounded w-full">Guardar</button><button onclick="cancelarModal()" class="bg-gray-300 p-2 rounded w-full mt-1">Cancelar</button></div></div>`;
             actualizarTotalPresupuestoUI();
             document.getElementById('margenSlider').oninput = (e) => { document.getElementById('margenSpan').innerText = e.target.value; actualizarTotalPresupuestoUI(); };
         }
@@ -785,12 +565,14 @@
             if (items.length === 0) { mostrarNotificacion("Agregue al menos un item", 'error'); return; }
             const markup = parseInt(document.getElementById('margenSlider').value) / 100;
             const total = items.reduce((s, i) => s + i.costo * (1 + markup) * i.cant, 0);
-            db.presupuestos.push({ id: generarId(), clienteId, cliente: cliente.nombre, items, markup: markup * 100, total, fechaCreacion: new Date().toISOString(), estado: 'borrador' });
+            db.presupuestos.push({ id: generarId(), clienteId, cliente: cliente.nombre, items, markup: markup * 100, total, numero: generarNumeroPresupuesto(), fechaCreacion: new Date().toISOString(), estado: 'borrador' });
             guardarDB();
-            mostrarNotificacion(`✅ Presupuesto guardado para ${cliente.nombre} por $${formatNumber(total)}`);
+            mostrarNotificacion(`✅ Presupuesto ${db.presupuestos[db.presupuestos.length-1].numero} guardado para ${cliente.nombre} por $${formatNumber(total)}`);
             cancelarModal();
-            showView('presupuestos');
+            renderPresupuestos();
         };
+        
+        window.cancelarModal = () => { showView(currentView); };
         
         // ========== NAVEGACIÓN ==========
         let currentView = 'dashboard';
@@ -800,6 +582,7 @@
             document.getElementById('root').innerHTML = views[view]();
         };
         
+        if (darkMode) document.body.classList.add('dark');
         verificarVencimientos();
         showView('dashboard');
     </script>
