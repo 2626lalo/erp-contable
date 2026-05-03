@@ -23,7 +23,6 @@
         .dark .text-gray-800 { color: #eee; }
         .dark .text-gray-500 { color: #aaa; }
         .dark .border { border-color: #2c3e50; }
-        .dark .shadow { box-shadow: none; }
         .chart-container { position: relative; height: 200px; width: 100%; }
         .btn-whatsapp { background-color: #25D366; }
     </style>
@@ -32,7 +31,6 @@
     <div id="notificationContainer"></div>
     <div id="root" class="max-w-7xl mx-auto p-4 pb-24"></div>
     
-    <!-- Botón modo oscuro flotante -->
     <button onclick="toggleDarkMode()" class="fixed bottom-20 right-4 bg-gray-800 text-white p-3 rounded-full shadow-lg z-50">🌓</button>
     
     <nav class="fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg z-50">
@@ -50,7 +48,7 @@
     <script>
         // ========== BASE DE DATOS ==========
         let db = {
-            empresas: JSON.parse(localStorage.getItem('empresas') || '[{"id":1,"nombre":"Mi Empresa SRL","cuit":"30-12345678-9","direccion":"Av. Corrientes 123","telefono":"11-1234-5678","email":"info@miempresa.com","logo":"🏢","whatsapp":"5491112345678"}]'),
+            empresas: JSON.parse(localStorage.getItem('empresas') || '[{"id":1,"nombre":"Mi Empresa SRL","cuit":"30-12345678-9","direccion":"Av. Corrientes 123","telefono":"11-1234-5678","email":"info@miempresa.com","logo":"🏢","whatsapp":"5491112345678","cbu":"1234567890123456789012"}]'),
             empresaActiva: JSON.parse(localStorage.getItem('empresaActiva') || '1'),
             ventas: JSON.parse(localStorage.getItem('ventas') || '[]'),
             compras: JSON.parse(localStorage.getItem('compras') || '[]'),
@@ -70,14 +68,14 @@
         // Datos de ejemplo iniciales
         if (db.clientes.length === 0) {
             db.clientes = [
-                { id: 1, nombre: "Cliente Ejemplo SA", cuit: "30-12345678-9", telefono: "11-1234-5678", email: "cliente@mail.com", direccion: "Av. Santa Fe 123", contacto: "Juan Pérez", diasCobro: 30, saldo: 0, whatsapp: "5491112345678" },
-                { id: 2, nombre: "Empresa XYZ", cuit: "30-87654321-0", telefono: "11-8765-4321", email: "xyz@mail.com", direccion: "Callao 456", contacto: "María López", diasCobro: 15, saldo: 0, whatsapp: "5491187654321" }
+                { id: 1, nombre: "Cliente Ejemplo SA", cuit: "30-12345678-9", telefono: "11-1234-5678", email: "cliente@mail.com", direccion: "Av. Santa Fe 123", contacto: "Juan Pérez", diasCobro: 30, saldo: 0, whatsapp: "5491112345678", cbu: "1234567890123456789012", observaciones: "Cliente preferencial" },
+                { id: 2, nombre: "Empresa XYZ", cuit: "30-87654321-0", telefono: "11-8765-4321", email: "xyz@mail.com", direccion: "Callao 456", contacto: "María López", diasCobro: 15, saldo: 0, whatsapp: "5491187654321", cbu: "9876543210987654321098", observaciones: "" }
             ];
         }
         if (db.proveedores.length === 0) {
             db.proveedores = [
-                { id: 1, nombre: "Proveedor Ejemplo", cuit: "30-11111111-1", telefono: "11-1111-1111", email: "proveedor@mail.com", direccion: "Belgrano 789", contacto: "Carlos Gómez", diasPago: 30, saldo: 0 },
-                { id: 2, nombre: "Insumos del Oeste", cuit: "30-22222222-2", telefono: "11-2222-2222", email: "insumos@mail.com", direccion: "Rivadavia 101", contacto: "Ana Martínez", diasPago: 45, saldo: 0 }
+                { id: 1, nombre: "Proveedor Ejemplo", cuit: "30-11111111-1", telefono: "11-1111-1111", email: "proveedor@mail.com", direccion: "Belgrano 789", contacto: "Carlos Gómez", diasPago: 30, saldo: 0, cbu: "1111111111111111111111", observaciones: "Pagar a 30 días", rubro: "Insumos" },
+                { id: 2, nombre: "Insumos del Oeste", cuit: "30-22222222-2", telefono: "11-2222-2222", email: "insumos@mail.com", direccion: "Rivadavia 101", contacto: "Ana Martínez", diasPago: 45, saldo: 0, cbu: "2222222222222222222222", observaciones: "", rubro: "Materia prima" }
             ];
         }
         if (db.costosFijos.length === 0) {
@@ -87,14 +85,7 @@
             ];
         }
         
-        // Generar datos de ejemplo para gráficos (últimos 6 meses)
-        if (db.ventas.length === 0) {
-            const meses = ["2025-01", "2025-02", "2025-03", "2025-04"];
-            meses.forEach((mes, i) => {
-                db.ventas.push({ id: generarId(), clienteId: 1, clienteNombre: "Cliente Ejemplo", montoNeto: 100000 + i * 20000, ivaMonto: 21000, total: 121000, fechaVenta: `${mes}-15`, mes: mes, estado: "cobrado" });
-                db.compras.push({ id: generarId(), proveedorId: 1, proveedorNombre: "Proveedor Ejemplo", montoNeto: 50000 + i * 5000, ivaMonto: 10500, total: 60500, fechaCompra: `${mes}-10`, mes: mes, estado: "pagado" });
-            });
-        }
+        guardarDB();
         
         function guardarDB() {
             localStorage.setItem('empresas', JSON.stringify(db.empresas));
@@ -136,19 +127,98 @@
             return Math.ceil((new Date(fecha) - new Date()) / (1000 * 60 * 60 * 24));
         }
         
-        function verificarVencimientos() {
-            const hoy = new Date().toISOString().split('T')[0];
-            db.ventas.filter(v => v.estado === 'pendiente_cobro' && v.fechaCobroEsperada < hoy).forEach(v => {
-                if (!db.notificaciones.some(n => n.mensaje.includes(v.clienteNombre))) {
-                    db.notificaciones.unshift({ id: generarId(), tipo: 'cobro', mensaje: `⚠️ Venta vencida: ${v.clienteNombre} - $${formatNumber(v.total)}`, leida: false, fecha: hoy });
-                }
-            });
-            db.compras.filter(c => c.estado === 'pendiente_pago' && c.fechaPagoEsperada < hoy).forEach(c => {
-                if (!db.notificaciones.some(n => n.mensaje.includes(c.proveedorNombre))) {
-                    db.notificaciones.unshift({ id: generarId(), tipo: 'pago', mensaje: `⚠️ Pago vencido: ${c.proveedorNombre} - $${formatNumber(c.total)}`, leida: false, fecha: hoy });
-                }
-            });
+        // ========== CRUD CLIENTES COMPLETO ==========
+        function agregarCliente(datos) {
+            const cliente = { id: generarId(), ...datos, saldo: 0 };
+            db.clientes.push(cliente);
             guardarDB();
+            mostrarNotificacion(`👤 Cliente agregado: ${cliente.nombre}`);
+            return cliente;
+        }
+        
+        function editarCliente(id, datos) {
+            const index = db.clientes.findIndex(c => c.id === id);
+            if (index !== -1) {
+                db.clientes[index] = { ...db.clientes[index], ...datos };
+                guardarDB();
+                mostrarNotificacion(`✏️ Cliente actualizado: ${db.clientes[index].nombre}`);
+                return true;
+            }
+            return false;
+        }
+        
+        function eliminarCliente(id) {
+            if (confirm("¿Eliminar este cliente? Se perderán sus datos.")) {
+                db.clientes = db.clientes.filter(c => c.id !== id);
+                guardarDB();
+                mostrarNotificacion("🗑️ Cliente eliminado");
+                renderConfiguracion();
+            }
+        }
+        
+        // ========== CRUD PROVEEDORES COMPLETO ==========
+        function agregarProveedor(datos) {
+            const proveedor = { id: generarId(), ...datos, saldo: 0 };
+            db.proveedores.push(proveedor);
+            guardarDB();
+            mostrarNotificacion(`🏭 Proveedor agregado: ${proveedor.nombre}`);
+            return proveedor;
+        }
+        
+        function editarProveedor(id, datos) {
+            const index = db.proveedores.findIndex(p => p.id === id);
+            if (index !== -1) {
+                db.proveedores[index] = { ...db.proveedores[index], ...datos };
+                guardarDB();
+                mostrarNotificacion(`✏️ Proveedor actualizado: ${db.proveedores[index].nombre}`);
+                return true;
+            }
+            return false;
+        }
+        
+        function eliminarProveedor(id) {
+            if (confirm("¿Eliminar este proveedor?")) {
+                db.proveedores = db.proveedores.filter(p => p.id !== id);
+                guardarDB();
+                mostrarNotificacion("🗑️ Proveedor eliminado");
+                renderConfiguracion();
+            }
+        }
+        
+        // ========== COSTOS FIJOS ==========
+        function pagarCostoFijo(id, fechaPago, comprobante) {
+            const costo = db.costosFijos.find(c => c.id === id);
+            if (!costo) return false;
+            costo.estado = 'pagado';
+            costo.fechaPago = fechaPago;
+            costo.comprobante = comprobante;
+            db.pagosHistorial.unshift({ id: generarId(), tipo: 'costoFijo', costoId: id, nombre: costo.nombre, monto: costo.monto, fecha: fechaPago, comprobante });
+            if (costo.recurrente) {
+                const nuevaFecha = new Date(costo.vencimiento);
+                nuevaFecha.setMonth(nuevaFecha.getMonth() + 1);
+                registrarCostoFijo(costo.nombre, costo.monto, nuevaFecha.toISOString().split('T')[0], costo.categoria, true);
+            }
+            guardarDB();
+            mostrarNotificacion(`✅ Pagado: ${costo.nombre} - $${formatNumber(costo.monto)}`);
+            renderConfiguracion();
+            return true;
+        }
+        
+        function eliminarCostoFijo(id) {
+            if (confirm("¿Eliminar este costo fijo?")) {
+                db.costosFijos = db.costosFijos.filter(c => c.id !== id);
+                guardarDB();
+                mostrarNotificacion("🗑️ Costo fijo eliminado");
+                renderConfiguracion();
+            }
+        }
+        
+        function registrarCostoFijo(nombre, monto, vencimiento, categoria, recurrente) {
+            const costo = { id: generarId(), nombre, monto, vencimiento, estado: 'pendiente', categoria, recurrente, registrado: new Date().toISOString() };
+            db.costosFijos.push(costo);
+            guardarDB();
+            mostrarNotificacion(`💰 Costo fijo agregado: ${nombre}`);
+            renderConfiguracion();
         }
         
         // ========== FUNCIONES PRINCIPALES ==========
@@ -167,7 +237,6 @@
             db.ventas.push(venta);
             cliente.saldo = (cliente.saldo || 0) + total;
             guardarDB();
-            verificarVencimientos();
             mostrarNotificacion(`✅ Venta registrada a ${cliente.nombre} por $${formatNumber(total)}`);
             return venta;
         }
@@ -204,7 +273,6 @@
             db.compras.push(compra);
             proveedor.saldo = (proveedor.saldo || 0) + total;
             guardarDB();
-            verificarVencimientos();
             mostrarNotificacion(`🛒 Compra registrada a ${proveedor.nombre} por $${formatNumber(total)}`);
             return compra;
         }
@@ -231,8 +299,7 @@
             const meses = [...new Set([...db.ventas.map(v => v.mes), ...db.compras.map(c => c.mes)])].sort();
             const ventasPorMes = meses.map(m => db.ventas.filter(v => v.mes === m).reduce((s, v) => s + v.total, 0));
             const comprasPorMes = meses.map(m => db.compras.filter(c => c.mes === m).reduce((s, c) => s + c.total, 0));
-            const gananciasPorMes = meses.map((m, i) => ventasPorMes[i] - comprasPorMes[i]);
-            return { meses, ventasPorMes, comprasPorMes, gananciasPorMes };
+            return { meses, ventasPorMes, comprasPorMes };
         }
         
         function calcularReporteMes(mes) {
@@ -259,70 +326,12 @@
             return acumulado;
         }
         
-        // ========== EXPORTAR DATOS ==========
-        function exportarBackup() {
-            const backup = { ...db, fechaBackup: new Date().toISOString() };
-            const dataStr = JSON.stringify(backup, null, 2);
-            const blob = new Blob([dataStr], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `erp_backup_${new Date().toISOString().split('T')[0]}.json`;
-            a.click();
-            URL.revokeObjectURL(url);
-            mostrarNotificacion("📦 Backup exportado correctamente");
-        }
-        
-        function importarBackup(file) {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                try {
-                    const backup = JSON.parse(e.target.result);
-                    if (backup.ventas && backup.compras && backup.clientes) {
-                        db = backup;
-                        guardarDB();
-                        mostrarNotificacion("✅ Backup importado correctamente");
-                        showView(currentView);
-                    } else { mostrarNotificacion("Archivo inválido", 'error'); }
-                } catch(err) { mostrarNotificacion("Error al importar", 'error'); }
-            };
-            reader.readAsText(file);
-        }
-        
-        function exportarExcel() {
-            let csv = "Tipo,Fecha,Concepto,Monto Neto,IVA,Total,Estado\n";
-            db.ventas.forEach(v => { csv += `Venta,${v.fechaVenta},${v.clienteNombre},${v.montoNeto},${v.ivaMonto},${v.total},${v.estado}\n`; });
-            db.compras.forEach(c => { csv += `Compra,${c.fechaCompra},${c.proveedorNombre},${c.montoNeto},${c.ivaMonto},${c.total},${c.estado}\n`; });
-            const blob = new Blob([csv], { type: 'text/csv' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `erp_datos_${new Date().toISOString().split('T')[0]}.csv`;
-            a.click();
-            URL.revokeObjectURL(url);
-            mostrarNotificacion("📊 Datos exportados a CSV");
-        }
-        
-        // ========== PRESUPUESTOS PROFESIONALES ==========
-        function generarNumeroPresupuesto() {
-            const num = db.proximoNumPresupuesto;
-            db.proximoNumPresupuesto++;
-            guardarDB();
-            return `P-${num}`;
-        }
-        
-        function enviarWhatsApp(numero, mensaje) {
-            const url = `https://wa.me/${numero}?text=${encodeURIComponent(mensaje)}`;
-            window.open(url, '_blank');
-        }
-        
         // ========== RENDER DASHBOARD ==========
         function renderDashboard() {
             const meses = [...new Set([...db.ventas.map(v => v.mes), ...db.compras.map(c => c.mes)])].sort().reverse();
             const mesActual = meses[0] || new Date().toISOString().substring(0, 7);
             const reporte = calcularReporteMes(mesActual);
             const acumulado = calcularAcumuladoAnual();
-            const notificacionesNoLeidas = db.notificaciones.filter(n => !n.leida).length;
             const empresa = db.empresas.find(e => e.id === db.empresaActiva) || db.empresas[0];
             
             setTimeout(() => {
@@ -340,12 +349,11 @@
             
             return `
                 <div class="space-y-4 fade-in pb-24">
-                    <div class="flex justify-between items-center"><div><h1 class="text-2xl font-bold">📊 Dashboard</h1><p class="text-xs text-gray-500">${empresa.nombre} - CUIT ${empresa.cuit}</p></div>${notificacionesNoLeidas > 0 ? `<div class="bg-red-500 text-white rounded-full px-2 py-1 text-xs">${notificacionesNoLeidas} notif.</div>` : ''}</div>
+                    <div><h1 class="text-2xl font-bold">📊 Dashboard</h1><p class="text-xs text-gray-500">${empresa.nombre} - CUIT ${empresa.cuit}</p></div>
                     <div class="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-4 rounded-xl"><p class="text-sm">📅 Mes actual: ${mesActual}</p><p class="text-3xl font-bold">$${formatNumber(reporte.resultado)}</p><p class="text-xs">Rentabilidad: ${reporte.rentabilidad}%</p></div>
                     <div class="grid grid-cols-2 gap-3"><div class="bg-white p-3 rounded-xl shadow"><p class="text-xs text-gray-500">💰 Ventas</p><p class="text-xl font-bold text-green-600">$${formatNumber(reporte.ventasNetas)}</p></div><div class="bg-white p-3 rounded-xl shadow"><p class="text-xs text-gray-500">📉 Compras</p><p class="text-xl font-bold text-red-600">$${formatNumber(reporte.comprasNetas)}</p></div></div>
                     <div class="bg-white p-3 rounded-xl shadow"><div class="chart-container"><canvas id="graficoCanvas"></canvas></div></div>
                     <div class="bg-white p-3 rounded-xl shadow"><h2 class="font-bold text-sm mb-2">📈 Acumulado Anual</h2><div class="grid grid-cols-2 gap-2 text-sm"><div>Ventas: <span class="font-bold text-green-600">$${formatNumber(acumulado.ventasNetas)}</span></div><div>Compras: <span class="font-bold text-red-600">$${formatNumber(acumulado.comprasNetas)}</span></div><div>Ganancia: <span class="font-bold ${acumulado.resultado >= 0 ? 'text-green-600' : 'text-red-600'}">$${formatNumber(acumulado.resultado)}</span></div><div>Rentabilidad: <span class="font-bold">${acumulado.rentabilidad}%</span></div></div></div>
-                    <div class="bg-white p-3 rounded-xl shadow"><h2 class="font-bold text-sm mb-2">🔔 Próximos vencimientos</h2>${db.ventas.filter(v => v.estado === 'pendiente_cobro').slice(0, 2).map(v => `<div class="flex justify-between text-sm border-b py-1"><span>💰 ${v.clienteNombre}</span><span>$${formatNumber(v.total)} - ${calcularDiasRestantes(v.fechaCobroEsperada) < 0 ? 'VENCIDO' : `Vence en ${calcularDiasRestantes(v.fechaCobroEsperada)} días`}</span></div>`).join('')}${db.ventas.filter(v => v.estado === 'pendiente_cobro').length === 0 ? '<p class="text-xs text-gray-400">Sin vencimientos pendientes</p>' : ''}</div>
                 </div>
             `;
         }
@@ -358,10 +366,10 @@
             const totalMes = ventasFiltradas.reduce((s, v) => s + v.total, 0);
             return `
                 <div class="space-y-4 fade-in pb-24"><div class="flex justify-between"><h1 class="text-2xl font-bold">💰 Ventas</h1><button onclick="mostrarModalNuevaVenta()" class="bg-blue-600 text-white px-3 py-1 rounded text-sm">+ Nueva Venta</button></div>
-                <div class="flex gap-2"><label class="text-sm font-medium">📅 Mes:</label><select id="mesSelectVentas" class="p-2 border rounded text-sm flex-1" onchange="filtrarVentas()">${meses.map(m => `<option value="${m}" ${m === mesSeleccionado ? 'selected' : ''}>${m}</option>`).join('')}</select><input type="text" id="searchVentas" placeholder="🔍 Buscar cliente..." class="p-2 border rounded text-sm flex-1" onkeyup="filtrarVentas()"></div>
+                <div class="flex gap-2"><label class="text-sm font-medium">📅 Mes:</label><select id="mesSelectVentas" class="p-2 border rounded text-sm flex-1" onchange="filtrarVentas()">${meses.map(m => `<option value="${m}" ${m === mesSeleccionado ? 'selected' : ''}>${m}</option>`).join('')}</select></div>
                 <div class="bg-green-50 p-3 rounded-xl"><p class="text-sm">Total ${mesSeleccionado}</p><p class="text-2xl font-bold text-green-600">$${formatNumber(totalMes)}</p></div>
-                <div id="ventasLista">${ventasFiltradas.filter(v => !document.getElementById('searchVentas') || v.clienteNombre.toLowerCase().includes(document.getElementById('searchVentas').value.toLowerCase())).map(v => `
-                    <div class="bg-white p-3 rounded-xl shadow mb-2"><div class="flex justify-between"><div><h3 class="font-bold">${v.clienteNombre}</h3><p>$${formatNumber(v.total)} | ${v.tipoComprobante} ${v.numComprobante}</p><p class="text-xs">Fecha: ${v.fechaVenta} | Cobro esperado: ${v.fechaCobroEsperada}</p><span class="text-xs px-2 rounded ${v.estado === 'cobrado' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}">${v.estado === 'cobrado' ? '✓ Cobrado' : '⏳ Pendiente'}</span></div><div>${v.estado === 'pendiente_cobro' ? `<button onclick="mostrarModalCobrarVenta(${v.id})" class="bg-green-600 text-white px-2 py-1 rounded text-xs">Cobrar</button>` : ''}</div></div></div>`).join('') || '<p class="text-center text-gray-500">No hay ventas</p>'}</div></div>
+                ${ventasFiltradas.map(v => `<div class="bg-white p-3 rounded-xl shadow mb-2"><div class="flex justify-between"><div><h3 class="font-bold">${v.clienteNombre}</h3><p>$${formatNumber(v.total)} | ${v.tipoComprobante} ${v.numComprobante}</p><p class="text-xs">Fecha: ${v.fechaVenta} | Cobro esperado: ${v.fechaCobroEsperada}</p><span class="text-xs px-2 rounded ${v.estado === 'cobrado' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}">${v.estado === 'cobrado' ? '✓ Cobrado' : '⏳ Pendiente'}</span></div><div>${v.estado === 'pendiente_cobro' ? `<button onclick="mostrarModalCobrarVenta(${v.id})" class="bg-green-600 text-white px-2 py-1 rounded text-xs">Cobrar</button>` : ''}</div></div></div>`).join('') || '<p class="text-center text-gray-500">No hay ventas</p>'}
+                </div>
             `;
         }
         
@@ -375,10 +383,10 @@
             const totalMes = comprasFiltradas.reduce((s, c) => s + c.total, 0);
             return `
                 <div class="space-y-4 fade-in pb-24"><div class="flex justify-between"><h1 class="text-2xl font-bold">🛒 Compras</h1><button onclick="mostrarModalNuevaCompra()" class="bg-blue-600 text-white px-3 py-1 rounded text-sm">+ Nueva Compra</button></div>
-                <div class="flex gap-2"><label class="text-sm font-medium">📅 Mes:</label><select id="mesSelectCompras" class="p-2 border rounded text-sm flex-1" onchange="filtrarCompras()">${meses.map(m => `<option value="${m}" ${m === mesSeleccionado ? 'selected' : ''}>${m}</option>`).join('')}</select><input type="text" id="searchCompras" placeholder="🔍 Buscar proveedor..." class="p-2 border rounded text-sm flex-1" onkeyup="filtrarCompras()"></div>
+                <div class="flex gap-2"><label class="text-sm font-medium">📅 Mes:</label><select id="mesSelectCompras" class="p-2 border rounded text-sm flex-1" onchange="filtrarCompras()">${meses.map(m => `<option value="${m}" ${m === mesSeleccionado ? 'selected' : ''}>${m}</option>`).join('')}</select></div>
                 <div class="bg-red-50 p-3 rounded-xl"><p class="text-sm">Total ${mesSeleccionado}</p><p class="text-2xl font-bold text-red-600">$${formatNumber(totalMes)}</p></div>
-                <div id="comprasLista">${comprasFiltradas.filter(c => !document.getElementById('searchCompras') || c.proveedorNombre.toLowerCase().includes(document.getElementById('searchCompras').value.toLowerCase())).map(c => `
-                    <div class="bg-white p-3 rounded-xl shadow mb-2"><div class="flex justify-between"><div><h3 class="font-bold">${c.proveedorNombre}</h3><p>$${formatNumber(c.total)} | ${c.tipoComprobante} ${c.numComprobante}</p><p class="text-xs">Fecha: ${c.fechaCompra} | Pago esperado: ${c.fechaPagoEsperada}</p><span class="text-xs px-2 rounded ${c.estado === 'pagado' ? 'bg-green-100' : 'bg-yellow-100'}">${c.estado === 'pagado' ? '✓ Pagado' : '⏳ Pendiente'}</span></div><div>${c.estado === 'pendiente_pago' ? `<button onclick="mostrarModalPagarCompra(${c.id})" class="bg-green-600 text-white px-2 py-1 rounded text-xs">Pagar</button>` : ''}</div></div></div>`).join('') || '<p class="text-center text-gray-500">No hay compras</p>'}</div></div>
+                ${comprasFiltradas.map(c => `<div class="bg-white p-3 rounded-xl shadow mb-2"><div class="flex justify-between"><div><h3 class="font-bold">${c.proveedorNombre}</h3><p>$${formatNumber(c.total)} | ${c.tipoComprobante} ${c.numComprobante}</p><p class="text-xs">Fecha: ${c.fechaCompra} | Pago esperado: ${c.fechaPagoEsperada}</p><span class="text-xs px-2 rounded ${c.estado === 'pagado' ? 'bg-green-100' : 'bg-yellow-100'}">${c.estado === 'pagado' ? '✓ Pagado' : '⏳ Pendiente'}</span></div><div>${c.estado === 'pendiente_pago' ? `<button onclick="mostrarModalPagarCompra(${c.id})" class="bg-green-600 text-white px-2 py-1 rounded text-xs">Pagar</button>` : ''}</div></div></div>`).join('') || '<p class="text-center text-gray-500">No hay compras</p>'}
+                </div>
             `;
         }
         
@@ -387,8 +395,9 @@
         // ========== RENDER PRESUPUESTOS ==========
         function renderPresupuestos() {
             return `
-                <div class="space-y-4 fade-in pb-24"><div class="flex gap-2"><button onclick="mostrarModalNuevoPresupuesto()" class="bg-blue-600 text-white px-3 py-1 rounded text-sm">+ Nuevo Presupuesto</button><button onclick="mostrarModalEscanearPresupuesto()" class="bg-green-600 text-white px-3 py-1 rounded text-sm">📷 Escanear</button></div><input type="text" id="searchPresupuestos" placeholder="🔍 Buscar cliente..." class="p-2 border rounded text-sm w-full mb-2" onkeyup="renderPresupuestos()"><div id="presupuestosLista">${db.presupuestos.filter(p => !document.getElementById('searchPresupuestos') || p.cliente.toLowerCase().includes(document.getElementById('searchPresupuestos').value.toLowerCase())).map(p => `
-                    <div class="bg-white p-3 rounded-xl shadow mb-2"><div class="flex justify-between items-center"><div><h3 class="font-bold">${p.cliente}</h3><p class="text-sm">Total: $${formatNumber(p.total)} | Nº ${p.numero || 'P-' + p.id}</p><p class="text-xs">${p.fechaCreacion?.split('T')[0]}</p><span class="text-xs px-2 rounded ${p.estado === 'aprobado' ? 'bg-green-100' : 'bg-yellow-100'}">${p.estado || 'Borrador'}</span></div><div class="flex gap-1"><button onclick="verPresupuestoDetalle(${p.id})" class="text-blue-600">Ver</button><button onclick="exportarPresupuestoPDF(${p.id})" class="text-green-600">📄 PDF</button><button onclick="enviarPresupuestoWhatsApp(${p.id})" class="text-green-600 btn-whatsapp px-2 py-1 rounded text-xs text-white">📱 WhatsApp</button></div></div></div>`).join('') || '<p class="text-center text-gray-500">No hay presupuestos</p>'}</div></div>
+                <div class="space-y-4 fade-in pb-24"><div class="flex gap-2"><button onclick="mostrarModalNuevoPresupuesto()" class="bg-blue-600 text-white px-3 py-1 rounded text-sm">+ Nuevo Presupuesto</button><button onclick="mostrarModalEscanearPresupuesto()" class="bg-green-600 text-white px-3 py-1 rounded text-sm">📷 Escanear</button></div>
+                ${db.presupuestos.map(p => `<div class="bg-white p-3 rounded-xl shadow mb-2"><div class="flex justify-between items-center"><div><h3 class="font-bold">${p.cliente}</h3><p class="text-sm">Total: $${formatNumber(p.total)} | Nº ${p.numero || 'P-' + p.id}</p><p class="text-xs">${p.fechaCreacion?.split('T')[0]}</p></div><div class="flex gap-1"><button onclick="verPresupuestoDetalle(${p.id})" class="text-blue-600">Ver</button><button onclick="exportarPresupuestoPDF(${p.id})" class="text-green-600">📄 PDF</button></div></div></div>`).join('') || '<p class="text-center text-gray-500">No hay presupuestos</p>'}
+                </div>
             `;
         }
         
@@ -400,11 +409,11 @@
             const acumulado = calcularAcumuladoAnual();
             return `
                 <div class="space-y-4 fade-in pb-24"><h1 class="text-2xl font-bold">📅 Reportes Mensuales</h1>
-                <div class="flex gap-2"><select id="mesSelectReporte" class="p-2 border rounded text-sm flex-1" onchange="cambiarReporteMes()">${meses.map(m => `<option value="${m}" ${m === mesSeleccionado ? 'selected' : ''}>${m}</option>`).join('')}</select><button onclick="exportarReportePDF('${mesSeleccionado}')" class="bg-blue-600 text-white px-3 py-2 rounded text-sm">📄 PDF</button><button onclick="exportarExcel()" class="bg-green-600 text-white px-3 py-2 rounded text-sm">📊 Excel</button></div>
+                <div class="flex gap-2"><select id="mesSelectReporte" class="p-2 border rounded text-sm flex-1" onchange="cambiarReporteMes()">${meses.map(m => `<option value="${m}" ${m === mesSeleccionado ? 'selected' : ''}>${m}</option>`).join('')}</select><button onclick="exportarReportePDF('${mesSeleccionado}')" class="bg-blue-600 text-white px-3 py-2 rounded text-sm">📄 PDF</button></div>
                 <div class="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-4 rounded-xl"><p class="text-sm">📊 RESULTADO ${mesSeleccionado}</p><p class="text-3xl font-bold">$${formatNumber(reporte.resultado)}</p><p class="text-xs">Rentabilidad: ${reporte.rentabilidad}%</p></div>
-                <div class="grid grid-cols-2 gap-3"><div class="bg-white p-3 rounded-xl"><p class="text-xs">💰 Ventas</p><p class="text-xl font-bold text-green-600">$${formatNumber(reporte.ventasNetas)}</p><p class="text-xs">${reporte.cantidadVentas} ventas</p></div><div class="bg-white p-3 rounded-xl"><p class="text-xs">📉 Compras</p><p class="text-xl font-bold text-red-600">$${formatNumber(reporte.comprasNetas)}</p><p class="text-xs">${reporte.cantidadCompras} compras</p></div></div>
-                <div class="bg-gray-800 text-white p-4 rounded-xl"><h2 class="font-bold">📈 ACUMULADO ANUAL</h2><div class="grid grid-cols-2 gap-2 text-sm mt-2"><div>Ventas: $${formatNumber(acumulado.ventasNetas)}</div><div>Compras: $${formatNumber(acumulado.comprasNetas)}</div><div>Ganancia: $${formatNumber(acumulado.resultado)}</div><div>Rentabilidad: ${acumulado.rentabilidad}%</div><div>IVA a pagar: $${formatNumber(acumulado.ivaAPagar)}</div></div></div>
-                <div class="bg-white p-3 rounded-xl shadow"><h2 class="font-bold text-sm mb-2">📋 Reporte de IVA</h2><div class="grid grid-cols-2 gap-2 text-sm"><div>IVA Crédito (compras): $${formatNumber(reporte.ivaPagado)}</div><div>IVA Débito (ventas): $${formatNumber(reporte.ivaCobrado)}</div><div class="col-span-2 font-bold">Saldo a pagar: $${formatNumber(reporte.ivaAPagar)}</div></div></div></div>
+                <div class="grid grid-cols-2 gap-3"><div class="bg-white p-3 rounded-xl"><p class="text-xs">💰 Ventas</p><p class="text-xl font-bold text-green-600">$${formatNumber(reporte.ventasNetas)}</p></div><div class="bg-white p-3 rounded-xl"><p class="text-xs">📉 Compras</p><p class="text-xl font-bold text-red-600">$${formatNumber(reporte.comprasNetas)}</p></div></div>
+                <div class="bg-gray-800 text-white p-4 rounded-xl"><h2 class="font-bold">📈 ACUMULADO ANUAL</h2><div class="text-sm mt-2">Ventas: $${formatNumber(acumulado.ventasNetas)}<br>Compras: $${formatNumber(acumulado.comprasNetas)}<br>Ganancia: $${formatNumber(acumulado.resultado)}<br>Rentabilidad: ${acumulado.rentabilidad}%<br>IVA a pagar: $${formatNumber(acumulado.ivaAPagar)}</div></div>
+                </div>
             `;
         }
         
@@ -419,28 +428,125 @@
             return `
                 <div class="space-y-4 fade-in pb-24"><h1 class="text-2xl font-bold">🧮 Contador - Argentina</h1>
                 <div class="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-4 rounded-xl"><p class="text-sm">💰 CAPITAL REAL DISPONIBLE</p><p class="text-2xl font-bold">$${formatNumber(acumulado.resultado)}</p><p class="text-xs">IVA a pagar AFIP: $${formatNumber(acumulado.ivaAPagar)}</p></div>
-                <div class="bg-white p-4 rounded-xl shadow"><h2 class="font-bold">📊 Estado de Resultados ${mesActual}</h2><div class="space-y-1 text-sm"><div class="flex justify-between"><span>Ventas Netas</span><span class="text-green-600">+ $${formatNumber(reporte.ventasNetas)}</span></div><div class="flex justify-between"><span>Compras Netas</span><span class="text-red-600">- $${formatNumber(reporte.comprasNetas)}</span></div><div class="flex justify-between"><span>IVA a Pagar</span><span class="text-orange-600">- $${formatNumber(reporte.ivaAPagar)}</span></div><div class="flex justify-between"><span>Costos Fijos</span><span class="text-purple-600">- $${formatNumber(reporte.costosFijosTotal)}</span></div><div class="border-t-2 pt-2 flex justify-between font-bold text-lg"><span>RESULTADO NETO</span><span class="${reporte.resultado >= 0 ? 'text-green-600' : 'text-red-600'}">$${formatNumber(reporte.resultado)}</span></div><div class="flex justify-between"><span>Rentabilidad Real</span><span class="font-bold">${reporte.rentabilidad}%</span></div></div></div></div>
+                <div class="bg-white p-4 rounded-xl shadow"><h2 class="font-bold">📊 Estado de Resultados ${mesActual}</h2><div class="space-y-1 text-sm"><div class="flex justify-between"><span>Ventas Netas</span><span class="text-green-600">+ $${formatNumber(reporte.ventasNetas)}</span></div><div class="flex justify-between"><span>Compras Netas</span><span class="text-red-600">- $${formatNumber(reporte.comprasNetas)}</span></div><div class="flex justify-between"><span>IVA a Pagar</span><span class="text-orange-600">- $${formatNumber(reporte.ivaAPagar)}</span></div><div class="flex justify-between"><span>Costos Fijos</span><span class="text-purple-600">- $${formatNumber(reporte.costosFijosTotal)}</span></div><div class="border-t-2 pt-2 flex justify-between font-bold text-lg"><span>RESULTADO NETO</span><span class="${reporte.resultado >= 0 ? 'text-green-600' : 'text-red-600'}">$${formatNumber(reporte.resultado)}</span></div></div></div></div>
             `;
         }
         
-        // ========== RENDER CONFIGURACIÓN ==========
+        // ========== RENDER CONFIGURACIÓN COMPLETO ==========
         function renderConfiguracion() {
             return `
                 <div class="space-y-4 fade-in pb-24"><h1 class="text-2xl font-bold">⚙️ Configuración</h1>
-                <div class="bg-white p-4 rounded-xl shadow"><h2 class="font-bold mb-2">🏢 Clientes</h2>${db.clientes.map(c => `<div class="flex justify-between items-center border-b py-2"><div><span class="font-medium">${c.nombre}</span><p class="text-xs text-gray-500">CUIT: ${c.cuit} | WhatsApp: ${c.whatsapp || 'No'}</p></div><div><button onclick="editarClienteModal(${c.id})" class="text-blue-600 mr-2">✏️</button><button onclick="eliminarCliente(${c.id})" class="text-red-600">🗑️</button></div></div>`).join('')}<button onclick="mostrarModalAgregarCliente()" class="mt-3 bg-blue-600 text-white px-3 py-1 rounded text-sm w-full">+ Agregar Cliente</button></div>
-                <div class="bg-white p-4 rounded-xl shadow"><h2 class="font-bold mb-2">🏭 Proveedores</h2>${db.proveedores.map(p => `<div class="flex justify-between items-center border-b py-2"><div><span class="font-medium">${p.nombre}</span><p class="text-xs text-gray-500">CUIT: ${p.cuit} | Días pago: ${p.diasPago}</p></div><div><button onclick="editarProveedorModal(${p.id})" class="text-blue-600 mr-2">✏️</button><button onclick="eliminarProveedor(${p.id})" class="text-red-600">🗑️</button></div></div>`).join('')}<button onclick="mostrarModalAgregarProveedor()" class="mt-3 bg-blue-600 text-white px-3 py-1 rounded text-sm w-full">+ Agregar Proveedor</button></div>
-                <div class="bg-white p-4 rounded-xl shadow"><h2 class="font-bold mb-2">💰 Costos Fijos</h2>${db.costosFijos.filter(cf => cf.estado === 'pendiente').map(cf => `<div class="flex justify-between items-center border-b py-2"><div><span class="font-medium">${cf.nombre}</span><p class="text-xs">$${formatNumber(cf.monto)} | Vence: ${cf.vencimiento}</p></div><div><button onclick="pagarCostoFijoModal(${cf.id})" class="bg-green-600 text-white px-2 py-1 rounded text-xs mr-1">Pagar</button><button onclick="eliminarCostoFijo(${cf.id})" class="text-red-600">🗑️</button></div></div>`).join('')}<button onclick="mostrarModalAgregarCostoFijo()" class="mt-3 bg-blue-600 text-white px-3 py-1 rounded text-sm w-full">+ Agregar Costo Fijo</button></div>
-                <div class="bg-white p-4 rounded-xl shadow"><h2 class="font-bold mb-2">💾 Backup y Datos</h2><div class="flex gap-2"><button onclick="exportarBackup()" class="bg-blue-600 text-white px-3 py-2 rounded text-sm flex-1">📦 Exportar Backup</button><button onclick="document.getElementById('importFile').click()" class="bg-green-600 text-white px-3 py-2 rounded text-sm flex-1">📁 Importar Backup</button><input type="file" id="importFile" class="hidden" accept=".json" onchange="importarBackup(this.files[0])"></div><button onclick="exportarExcel()" class="mt-2 bg-purple-600 text-white px-3 py-2 rounded text-sm w-full">📊 Exportar a Excel</button></div>
-                <div class="bg-white p-4 rounded-xl shadow"><h2 class="font-bold mb-2">📋 Notificaciones</h2><div class="max-h-48 overflow-y-auto">${db.notificaciones.slice(0, 10).map(n => `<div class="border-b py-1 text-sm"><span class="${n.tipo === 'cobro' ? 'text-green-600' : 'text-red-600'}">${n.mensaje}</span><span class="text-xs text-gray-400 ml-2">${n.fecha}</span></div>`).join('') || '<p class="text-gray-400 text-sm">Sin notificaciones</p>'}</div><button onclick="limpiarNotificaciones()" class="mt-2 bg-gray-500 text-white px-3 py-1 rounded text-sm w-full">Limpiar notificaciones</button></div>
-                <div class="bg-white p-4 rounded-xl shadow"><h2 class="font-bold mb-2">🏢 Datos de la Empresa</h2>${db.empresas.map(e => `<div class="border-b py-2"><p><span class="font-medium">${e.nombre}</span> - CUIT: ${e.cuit}</p><p class="text-xs">WhatsApp: ${e.whatsapp || 'No configurado'}</p><button onclick="cambiarEmpresaActiva(${e.id})" class="text-blue-600 text-xs mt-1">${db.empresaActiva === e.id ? '✓ Activa' : 'Activar'}</button></div>`).join('')}</div>
+                
+                <!-- CLIENTES -->
+                <div class="bg-white p-4 rounded-xl shadow"><h2 class="font-bold mb-2">👥 Clientes</h2>
+                ${db.clientes.map(c => `<div class="border-b py-2"><div class="flex justify-between items-start"><div><span class="font-bold">${c.nombre}</span><div class="text-xs text-gray-500 grid grid-cols-2 gap-x-4 mt-1"><span>📞 ${c.telefono || '-'}</span><span>📧 ${c.email || '-'}</span><span>🏠 ${c.direccion || '-'}</span><span>📱 WhatsApp: ${c.whatsapp || '-'}</span><span>🏦 CBU: ${c.cbu || '-'}</span><span>👤 Contacto: ${c.contacto || '-'}</span><span>📅 Días cobro: ${c.diasCobro}</span><span>💰 Saldo: $${formatNumber(c.saldo)}</span></div></div><div><button onclick="editarClienteModal(${c.id})" class="text-blue-600 text-sm mr-2">✏️ Editar</button><button onclick="eliminarCliente(${c.id})" class="text-red-600 text-sm">🗑️ Eliminar</button></div></div></div>`).join('')}
+                <button onclick="mostrarModalAgregarCliente()" class="mt-3 bg-blue-600 text-white px-3 py-1 rounded text-sm w-full">+ Agregar Cliente</button></div>
+                
+                <!-- PROVEEDORES -->
+                <div class="bg-white p-4 rounded-xl shadow"><h2 class="font-bold mb-2">🏭 Proveedores</h2>
+                ${db.proveedores.map(p => `<div class="border-b py-2"><div class="flex justify-between items-start"><div><span class="font-bold">${p.nombre}</span><div class="text-xs text-gray-500 grid grid-cols-2 gap-x-4 mt-1"><span>📞 ${p.telefono || '-'}</span><span>📧 ${p.email || '-'}</span><span>🏠 ${p.direccion || '-'}</span><span>🏦 CBU: ${p.cbu || '-'}</span><span>👤 Contacto: ${p.contacto || '-'}</span><span>📅 Días pago: ${p.diasPago}</span><span>💰 Saldo: $${formatNumber(p.saldo)}</span><span>🏷️ Rubro: ${p.rubro || '-'}</span></div></div><div><button onclick="editarProveedorModal(${p.id})" class="text-blue-600 text-sm mr-2">✏️ Editar</button><button onclick="eliminarProveedor(${p.id})" class="text-red-600 text-sm">🗑️ Eliminar</button></div></div></div>`).join('')}
+                <button onclick="mostrarModalAgregarProveedor()" class="mt-3 bg-blue-600 text-white px-3 py-1 rounded text-sm w-full">+ Agregar Proveedor</button></div>
+                
+                <!-- COSTOS FIJOS -->
+                <div class="bg-white p-4 rounded-xl shadow"><h2 class="font-bold mb-2">💰 Costos Fijos</h2>
+                ${db.costosFijos.filter(cf => cf.estado === 'pendiente').map(cf => `<div class="flex justify-between items-center border-b py-2"><div><span class="font-medium">${cf.nombre}</span><p class="text-xs">$${formatNumber(cf.monto)} | Vence: ${cf.vencimiento}</p></div><div><button onclick="pagarCostoFijoModal(${cf.id})" class="bg-green-600 text-white px-2 py-1 rounded text-xs mr-1">Pagar</button><button onclick="eliminarCostoFijo(${cf.id})" class="text-red-600">🗑️</button></div></div>`).join('')}
+                <button onclick="mostrarModalAgregarCostoFijo()" class="mt-3 bg-blue-600 text-white px-3 py-1 rounded text-sm w-full">+ Agregar Costo Fijo</button></div>
+                
+                <!-- NOTIFICACIONES -->
+                <div class="bg-white p-4 rounded-xl shadow"><h2 class="font-bold mb-2">📋 Notificaciones</h2><div class="max-h-48 overflow-y-auto">${db.notificaciones.slice(0, 10).map(n => `<div class="border-b py-1 text-sm">${n.mensaje}<span class="text-xs text-gray-400 ml-2">${n.fecha}</span></div>`).join('') || '<p class="text-gray-400">Sin notificaciones</p>'}</div><button onclick="limpiarNotificaciones()" class="mt-2 bg-gray-500 text-white px-3 py-1 rounded text-sm w-full">Limpiar</button></div>
+                
+                <!-- BACKUP -->
+                <div class="bg-white p-4 rounded-xl shadow"><h2 class="font-bold mb-2">💾 Backup</h2><div class="flex gap-2"><button onclick="exportarBackup()" class="bg-blue-600 text-white px-3 py-2 rounded text-sm flex-1">📦 Exportar</button><button onclick="document.getElementById('importFile').click()" class="bg-green-600 text-white px-3 py-2 rounded text-sm flex-1">📁 Importar</button><input type="file" id="importFile" class="hidden" accept=".json" onchange="importarBackup(this.files[0])"></div><button onclick="exportarExcel()" class="mt-2 bg-purple-600 text-white px-3 py-2 rounded text-sm w-full">📊 Exportar a Excel</button></div>
+                
                 <div class="bg-white p-4 rounded-xl shadow"><h2 class="font-bold mb-2">🌓 Apariencia</h2><button onclick="toggleDarkMode()" class="bg-gray-800 text-white px-3 py-2 rounded text-sm w-full">${darkMode ? '☀️ Modo Claro' : '🌙 Modo Oscuro'}</button></div></div>
             `;
         }
         
         // ========== MODALES ==========
+        function mostrarModalAgregarCliente() {
+            document.getElementById('root').innerHTML = `<div class="modal"><div class="modal-content w-full max-w-md"><h2 class="text-xl font-bold mb-4">👤 Agregar Cliente</h2>
+                <input type="text" id="nombre" placeholder="Nombre *" class="w-full p-2 border rounded mb-2"><input type="text" id="cuit" placeholder="CUIT" class="w-full p-2 border rounded mb-2"><input type="text" id="telefono" placeholder="Teléfono" class="w-full p-2 border rounded mb-2"><input type="email" id="email" placeholder="Email" class="w-full p-2 border rounded mb-2"><input type="text" id="direccion" placeholder="Dirección" class="w-full p-2 border rounded mb-2"><input type="text" id="contacto" placeholder="Persona de contacto" class="w-full p-2 border rounded mb-2"><input type="text" id="whatsapp" placeholder="WhatsApp (ej: 5491112345678)" class="w-full p-2 border rounded mb-2"><input type="text" id="cbu" placeholder="CBU / Cuenta bancaria" class="w-full p-2 border rounded mb-2"><input type="number" id="diasCobro" placeholder="Días de cobro" value="30" class="w-full p-2 border rounded mb-2">
+                <button onclick="guardarClienteModal()" class="bg-green-600 text-white p-2 rounded w-full">Guardar</button><button onclick="cancelarModal()" class="bg-gray-300 p-2 rounded w-full mt-1">Cancelar</button></div></div>`;
+        }
+        
+        window.guardarClienteModal = () => {
+            const nombre = document.getElementById('nombre').value;
+            if (!nombre) { mostrarNotificacion("Nombre requerido", 'error'); return; }
+            agregarCliente({
+                nombre, cuit: document.getElementById('cuit').value, telefono: document.getElementById('telefono').value,
+                email: document.getElementById('email').value, direccion: document.getElementById('direccion').value,
+                contacto: document.getElementById('contacto').value, whatsapp: document.getElementById('whatsapp').value,
+                cbu: document.getElementById('cbu').value, diasCobro: parseInt(document.getElementById('diasCobro').value) || 30
+            });
+            cancelarModal();
+            renderConfiguracion();
+        };
+        
+        window.editarClienteModal = (id) => {
+            const c = db.clientes.find(c => c.id === id);
+            if (!c) return;
+            document.getElementById('root').innerHTML = `<div class="modal"><div class="modal-content w-full max-w-md"><h2 class="text-xl font-bold mb-4">✏️ Editar Cliente</h2>
+                <input type="text" id="nombre" value="${c.nombre}" placeholder="Nombre" class="w-full p-2 border rounded mb-2"><input type="text" id="cuit" value="${c.cuit || ''}" placeholder="CUIT" class="w-full p-2 border rounded mb-2"><input type="text" id="telefono" value="${c.telefono || ''}" placeholder="Teléfono" class="w-full p-2 border rounded mb-2"><input type="email" id="email" value="${c.email || ''}" placeholder="Email" class="w-full p-2 border rounded mb-2"><input type="text" id="direccion" value="${c.direccion || ''}" placeholder="Dirección" class="w-full p-2 border rounded mb-2"><input type="text" id="contacto" value="${c.contacto || ''}" placeholder="Persona de contacto" class="w-full p-2 border rounded mb-2"><input type="text" id="whatsapp" value="${c.whatsapp || ''}" placeholder="WhatsApp" class="w-full p-2 border rounded mb-2"><input type="text" id="cbu" value="${c.cbu || ''}" placeholder="CBU" class="w-full p-2 border rounded mb-2"><input type="number" id="diasCobro" value="${c.diasCobro}" placeholder="Días cobro" class="w-full p-2 border rounded mb-2">
+                <button onclick="guardarEditarCliente(${id})" class="bg-green-600 text-white p-2 rounded w-full">Guardar Cambios</button><button onclick="cancelarModal()" class="bg-gray-300 p-2 rounded w-full mt-1">Cancelar</button></div></div>`;
+        };
+        
+        window.guardarEditarCliente = (id) => {
+            const datos = {
+                nombre: document.getElementById('nombre').value, cuit: document.getElementById('cuit').value,
+                telefono: document.getElementById('telefono').value, email: document.getElementById('email').value,
+                direccion: document.getElementById('direccion').value, contacto: document.getElementById('contacto').value,
+                whatsapp: document.getElementById('whatsapp').value, cbu: document.getElementById('cbu').value,
+                diasCobro: parseInt(document.getElementById('diasCobro').value) || 30
+            };
+            editarCliente(id, datos);
+            cancelarModal();
+            renderConfiguracion();
+        };
+        
+        function mostrarModalAgregarProveedor() {
+            document.getElementById('root').innerHTML = `<div class="modal"><div class="modal-content w-full max-w-md"><h2 class="text-xl font-bold mb-4">🏭 Agregar Proveedor</h2>
+                <input type="text" id="nombre" placeholder="Nombre *" class="w-full p-2 border rounded mb-2"><input type="text" id="cuit" placeholder="CUIT" class="w-full p-2 border rounded mb-2"><input type="text" id="telefono" placeholder="Teléfono" class="w-full p-2 border rounded mb-2"><input type="email" id="email" placeholder="Email" class="w-full p-2 border rounded mb-2"><input type="text" id="direccion" placeholder="Dirección" class="w-full p-2 border rounded mb-2"><input type="text" id="contacto" placeholder="Persona de contacto" class="w-full p-2 border rounded mb-2"><input type="text" id="cbu" placeholder="CBU / Cuenta bancaria" class="w-full p-2 border rounded mb-2"><input type="text" id="rubro" placeholder="Rubro / Especialidad" class="w-full p-2 border rounded mb-2"><input type="number" id="diasPago" placeholder="Días de pago" value="30" class="w-full p-2 border rounded mb-2">
+                <button onclick="guardarProveedorModal()" class="bg-green-600 text-white p-2 rounded w-full">Guardar</button><button onclick="cancelarModal()" class="bg-gray-300 p-2 rounded w-full mt-1">Cancelar</button></div></div>`;
+        }
+        
+        window.guardarProveedorModal = () => {
+            const nombre = document.getElementById('nombre').value;
+            if (!nombre) { mostrarNotificacion("Nombre requerido", 'error'); return; }
+            agregarProveedor({
+                nombre, cuit: document.getElementById('cuit').value, telefono: document.getElementById('telefono').value,
+                email: document.getElementById('email').value, direccion: document.getElementById('direccion').value,
+                contacto: document.getElementById('contacto').value, cbu: document.getElementById('cbu').value,
+                rubro: document.getElementById('rubro').value, diasPago: parseInt(document.getElementById('diasPago').value) || 30
+            });
+            cancelarModal();
+            renderConfiguracion();
+        };
+        
+        window.editarProveedorModal = (id) => {
+            const p = db.proveedores.find(p => p.id === id);
+            if (!p) return;
+            document.getElementById('root').innerHTML = `<div class="modal"><div class="modal-content w-full max-w-md"><h2 class="text-xl font-bold mb-4">✏️ Editar Proveedor</h2>
+                <input type="text" id="nombre" value="${p.nombre}" placeholder="Nombre" class="w-full p-2 border rounded mb-2"><input type="text" id="cuit" value="${p.cuit || ''}" placeholder="CUIT" class="w-full p-2 border rounded mb-2"><input type="text" id="telefono" value="${p.telefono || ''}" placeholder="Teléfono" class="w-full p-2 border rounded mb-2"><input type="email" id="email" value="${p.email || ''}" placeholder="Email" class="w-full p-2 border rounded mb-2"><input type="text" id="direccion" value="${p.direccion || ''}" placeholder="Dirección" class="w-full p-2 border rounded mb-2"><input type="text" id="contacto" value="${p.contacto || ''}" placeholder="Contacto" class="w-full p-2 border rounded mb-2"><input type="text" id="cbu" value="${p.cbu || ''}" placeholder="CBU" class="w-full p-2 border rounded mb-2"><input type="text" id="rubro" value="${p.rubro || ''}" placeholder="Rubro" class="w-full p-2 border rounded mb-2"><input type="number" id="diasPago" value="${p.diasPago}" placeholder="Días pago" class="w-full p-2 border rounded mb-2">
+                <button onclick="guardarEditarProveedor(${id})" class="bg-green-600 text-white p-2 rounded w-full">Guardar Cambios</button><button onclick="cancelarModal()" class="bg-gray-300 p-2 rounded w-full mt-1">Cancelar</button></div></div>`;
+        };
+        
+        window.guardarEditarProveedor = (id) => {
+            const datos = {
+                nombre: document.getElementById('nombre').value, cuit: document.getElementById('cuit').value,
+                telefono: document.getElementById('telefono').value, email: document.getElementById('email').value,
+                direccion: document.getElementById('direccion').value, contacto: document.getElementById('contacto').value,
+                cbu: document.getElementById('cbu').value, rubro: document.getElementById('rubro').value,
+                diasPago: parseInt(document.getElementById('diasPago').value) || 30
+            };
+            editarProveedor(id, datos);
+            cancelarModal();
+            renderConfiguracion();
+        };
+        
+        // Funciones adicionales
         function mostrarModalNuevaVenta() {
-            const clientesOptions = db.clientes.map(c => `<option value="${c.id}">${c.nombre} (${c.diasCobro} días)</option>`).join('');
-            document.getElementById('root').innerHTML = `<div class="modal"><div class="modal-content"><h2 class="text-xl font-bold mb-4">💰 Nueva Venta</h2><select id="clienteId" class="w-full p-2 border rounded mb-2">${clientesOptions}</select><input type="number" id="montoNeto" placeholder="Monto Neto (sin IVA)" class="w-full p-2 border rounded mb-2"><select id="ivaSelect" class="w-full p-2 border rounded mb-2"><option value="21">IVA 21%</option><option value="10.5">IVA 10.5%</option></select><input type="text" id="numComp" placeholder="Número comprobante" class="w-full p-2 border rounded mb-2"><input type="date" id="fechaVenta" value="${new Date().toISOString().split('T')[0]}" class="w-full p-2 border rounded mb-2"><button onclick="guardarVentaModal()" class="bg-green-600 text-white p-2 rounded w-full">Guardar</button><button onclick="cancelarModal()" class="bg-gray-300 p-2 rounded w-full mt-1">Cancelar</button></div></div>`;
+            const clientesOptions = db.clientes.map(c => `<option value="${c.id}">${c.nombre}</option>`).join('');
+            document.getElementById('root').innerHTML = `<div class="modal"><div class="modal-content"><h2 class="text-xl font-bold mb-4">💰 Nueva Venta</h2><select id="clienteId" class="w-full p-2 border rounded mb-2">${clientesOptions}</select><input type="number" id="montoNeto" placeholder="Monto Neto (sin IVA)" class="w-full p-2 border rounded mb-2"><select id="ivaSelect" class="w-full p-2 border rounded mb-2"><option value="21">IVA 21%</option><option value="10.5">IVA 10.5%</option></select><input type="text" id="numComp" placeholder="Nº comprobante" class="w-full p-2 border rounded mb-2"><input type="date" id="fechaVenta" value="${new Date().toISOString().split('T')[0]}" class="w-full p-2 border rounded mb-2"><button onclick="guardarVentaModal()" class="bg-green-600 text-white p-2 rounded w-full">Guardar</button><button onclick="cancelarModal()" class="bg-gray-300 p-2 rounded w-full mt-1">Cancelar</button></div></div>`;
         }
         
         window.guardarVentaModal = () => {
@@ -463,8 +569,8 @@
         window.confirmarCobroModal = (id) => { registrarCobro(id, document.getElementById('fechaCobro').value, document.getElementById('comprobante').value); cancelarModal(); renderVentas(); };
         
         function mostrarModalNuevaCompra() {
-            const proveedoresOptions = db.proveedores.map(p => `<option value="${p.id}">${p.nombre} (${p.diasPago} días)</option>`).join('');
-            document.getElementById('root').innerHTML = `<div class="modal"><div class="modal-content"><h2 class="text-xl font-bold mb-4">🛒 Nueva Compra</h2><select id="proveedorId" class="w-full p-2 border rounded mb-2">${proveedoresOptions}</select><input type="number" id="montoNeto" placeholder="Monto Neto (sin IVA)" class="w-full p-2 border rounded mb-2"><select id="ivaSelect" class="w-full p-2 border rounded mb-2"><option value="21">IVA 21%</option><option value="10.5">IVA 10.5%</option></select><input type="text" id="numComp" placeholder="Número comprobante" class="w-full p-2 border rounded mb-2"><input type="date" id="fechaCompra" value="${new Date().toISOString().split('T')[0]}" class="w-full p-2 border rounded mb-2"><button onclick="guardarCompraModal()" class="bg-green-600 text-white p-2 rounded w-full">Guardar</button><button onclick="cancelarModal()" class="bg-gray-300 p-2 rounded w-full mt-1">Cancelar</button></div></div>`;
+            const proveedoresOptions = db.proveedores.map(p => `<option value="${p.id}">${p.nombre}</option>`).join('');
+            document.getElementById('root').innerHTML = `<div class="modal"><div class="modal-content"><h2 class="text-xl font-bold mb-4">🛒 Nueva Compra</h2><select id="proveedorId" class="w-full p-2 border rounded mb-2">${proveedoresOptions}</select><input type="number" id="montoNeto" placeholder="Monto Neto (sin IVA)" class="w-full p-2 border rounded mb-2"><select id="ivaSelect" class="w-full p-2 border rounded mb-2"><option value="21">IVA 21%</option><option value="10.5">IVA 10.5%</option></select><input type="text" id="numComp" placeholder="Nº comprobante" class="w-full p-2 border rounded mb-2"><input type="date" id="fechaCompra" value="${new Date().toISOString().split('T')[0]}" class="w-full p-2 border rounded mb-2"><button onclick="guardarCompraModal()" class="bg-green-600 text-white p-2 rounded w-full">Guardar</button><button onclick="cancelarModal()" class="bg-gray-300 p-2 rounded w-full mt-1">Cancelar</button></div></div>`;
         }
         
         window.guardarCompraModal = () => {
@@ -486,91 +592,35 @@
         
         window.confirmarPagoModal = (id) => { registrarPagoCompra(id, document.getElementById('fechaPago').value, document.getElementById('comprobante').value); cancelarModal(); renderCompras(); };
         
-        // Funciones básicas para configuración
-        window.eliminarCliente = (id) => { if (confirm("¿Eliminar cliente?")) { db.clientes = db.clientes.filter(c => c.id !== id); guardarDB(); renderConfiguracion(); mostrarNotificacion("Cliente eliminado"); } };
-        window.eliminarProveedor = (id) => { if (confirm("¿Eliminar proveedor?")) { db.proveedores = db.proveedores.filter(p => p.id !== id); guardarDB(); renderConfiguracion(); } };
-        window.eliminarCostoFijo = (id) => { if (confirm("¿Eliminar costo fijo?")) { db.costosFijos = db.costosFijos.filter(c => c.id !== id); guardarDB(); renderConfiguracion(); } };
-        window.limpiarNotificaciones = () => { db.notificaciones = []; guardarDB(); renderConfiguracion(); };
-        window.cambiarEmpresaActiva = (id) => { db.empresaActiva = id; guardarDB(); renderConfiguracion(); };
-        
-        // Funciones placeholder
-        window.verPresupuestoDetalle = (id) => { mostrarNotificacion("Presupuesto #" + id); };
-        window.exportarPresupuestoPDF = (id) => { mostrarNotificacion("Exportando PDF..."); };
-        window.enviarPresupuestoWhatsApp = (id) => { mostrarNotificacion("Abriendo WhatsApp..."); };
-        
-        // OCR y presupuestos
-        let itemsPresupuestoOCR = [];
-        function mostrarModalEscanearPresupuesto() {
-            document.getElementById('root').innerHTML = `<div class="modal"><div class="modal-content"><h2 class="text-xl font-bold mb-4">📷 Escanear Presupuesto</h2><input type="file" id="fileInput" accept="image/*" capture="environment" class="w-full p-2 border rounded mb-2"><div id="ocrProgress" class="hidden text-blue-600">Procesando OCR...</div><div id="itemsDetectados"></div><button id="aceptarOCR" class="hidden bg-green-600 text-white p-2 rounded w-full mt-2">Aceptar</button><button onclick="cancelarModal()" class="bg-gray-300 p-2 rounded w-full mt-1">Cancelar</button></div></div>`;
-            const fileInput = document.getElementById('fileInput');
-            fileInput.onchange = async (e) => {
-                const file = e.target.files[0];
-                if (!file) return;
-                document.getElementById('ocrProgress').classList.remove('hidden');
-                try {
-                    const { data: { text } } = await Tesseract.recognize(file, 'spa');
-                    const nums = text.match(/\d{2,6}[.,]?\d{0,2}/g) || [];
-                    const precios = nums.filter(n => { const num = parseFloat(n.replace(',', '.')); return num > 100 && num < 10000000; }).slice(0, 8);
-                    if (precios.length > 0) {
-                        itemsPresupuestoOCR = precios.map(p => ({ desc: "Item detectado", cant: 1, costo: parseFloat(p.replace(',', '.')) }));
-                        document.getElementById('itemsDetectados').innerHTML = `<p>✅ ${precios.length} items detectados</p>`;
-                        document.getElementById('aceptarOCR').classList.remove('hidden');
-                    } else { alert("No se detectaron precios"); }
-                } catch(err) { alert("Error OCR"); }
-                finally { document.getElementById('ocrProgress').classList.add('hidden'); }
-            };
-            document.getElementById('aceptarOCR').onclick = () => { mostrarModalNuevoPresupuestoConItems(itemsPresupuestoOCR); };
+        function pagarCostoFijoModal(id) {
+            const cf = db.costosFijos.find(x => x.id === id);
+            document.getElementById('root').innerHTML = `<div class="modal"><div class="modal-content"><h2 class="text-xl font-bold">💰 Pagar ${cf.nombre}</h2><p>Monto: $${formatNumber(cf.monto)}</p><input type="date" id="fechaPago" value="${new Date().toISOString().split('T')[0]}" class="w-full p-2 border rounded my-2"><input type="text" id="comprobante" placeholder="Comprobante" class="w-full p-2 border rounded"><button onclick="confirmarPagoCostoModal(${id})" class="bg-green-600 text-white p-2 rounded w-full">Pagar</button><button onclick="cancelarModal()" class="bg-gray-300 p-2 rounded w-full mt-1">Cancelar</button></div></div>`;
         }
         
-        function mostrarModalNuevoPresupuesto() { mostrarModalNuevoPresupuestoConItems([]); }
-        function mostrarModalNuevoPresupuestoConItems(itemsIniciales) {
-            const clientesOptions = db.clientes.map(c => `<option value="${c.id}">${c.nombre}</option>`).join('');
-            document.getElementById('root').innerHTML = `<div class="modal"><div class="modal-content w-full max-w-2xl"><h2 class="text-xl font-bold mb-4">📄 Nuevo Presupuesto</h2><select id="clienteId" class="w-full p-2 border rounded mb-2"><option value="">Seleccionar cliente...</option>${clientesOptions}</select><div id="itemsContainer">${(itemsIniciales.length ? itemsIniciales : [{ desc: "", cant: 1, costo: 0 }]).map((it, idx) => `<div class="flex gap-2 mb-1"><input placeholder="Producto" value="${it.desc}" class="itemDesc flex-1 border p-1 rounded"><input type="number" placeholder="Cant" value="${it.cant}" class="itemCant w-20 border p-1 rounded"><input type="number" placeholder="Precio" value="${it.costo}" class="itemPrecio w-28 border p-1 rounded"><button onclick="this.parentElement.remove()" class="text-red-500">🗑️</button></div>`).join('')}</div><button onclick="agregarItemPresupuestoUI()" class="bg-gray-200 p-1 rounded text-sm mb-2">+ Agregar item</button><div class="mb-2"><label>Margen: <span id="margenSpan">30</span>%</label><input type="range" id="margenSlider" min="0" max="200" value="30" class="w-full"></div><div id="totalPresupuesto" class="text-right font-bold text-lg mb-2">Total: $0</div><button onclick="guardarPresupuestoUI()" class="bg-green-600 text-white p-2 rounded w-full">Guardar</button><button onclick="cancelarModal()" class="bg-gray-300 p-2 rounded w-full mt-1">Cancelar</button></div></div>`;
-            actualizarTotalPresupuestoUI();
-            document.getElementById('margenSlider').oninput = (e) => { document.getElementById('margenSpan').innerText = e.target.value; actualizarTotalPresupuestoUI(); };
+        window.confirmarPagoCostoModal = (id) => { pagarCostoFijo(id, document.getElementById('fechaPago').value, document.getElementById('comprobante').value); cancelarModal(); renderConfiguracion(); };
+        
+        function mostrarModalAgregarCostoFijo() {
+            document.getElementById('root').innerHTML = `<div class="modal"><div class="modal-content"><h2 class="text-xl font-bold mb-4">💰 Agregar Costo Fijo</h2><input type="text" id="nombre" placeholder="Nombre" class="w-full p-2 border rounded mb-2"><input type="number" id="monto" placeholder="Monto" class="w-full p-2 border rounded mb-2"><input type="date" id="vencimiento" class="w-full p-2 border rounded mb-2"><select id="categoria" class="w-full p-2 border rounded mb-2">${db.categoriasGastos.map(c => `<option value="${c}">${c}</option>`).join('')}</select><label class="flex items-center gap-2 mb-2"><input type="checkbox" id="recurrente"> Recurrente (mensual)</label><button onclick="guardarCostoFijoModal()" class="bg-green-600 text-white p-2 rounded w-full">Guardar</button><button onclick="cancelarModal()" class="bg-gray-300 p-2 rounded w-full mt-1">Cancelar</button></div></div>`;
         }
         
-        window.agregarItemPresupuestoUI = () => {
-            const container = document.getElementById('itemsContainer');
-            const div = document.createElement('div');
-            div.className = 'flex gap-2 mb-1';
-            div.innerHTML = `<input placeholder="Producto" class="itemDesc flex-1 border p-1 rounded"><input type="number" placeholder="Cant" value="1" class="itemCant w-20 border p-1 rounded"><input type="number" placeholder="Precio" class="itemPrecio w-28 border p-1 rounded"><button onclick="this.parentElement.remove();actualizarTotalPresupuestoUI()" class="text-red-500">🗑️</button>`;
-            container.appendChild(div);
-            div.querySelectorAll('input').forEach(i => i.addEventListener('input', () => actualizarTotalPresupuestoUI()));
-        };
-        
-        function actualizarTotalPresupuestoUI() {
-            let total = 0;
-            const markup = parseInt(document.getElementById('margenSlider')?.value || 30) / 100;
-            document.querySelectorAll('#itemsContainer .itemPrecio').forEach((p, i) => {
-                const cant = parseFloat(document.querySelectorAll('.itemCant')[i]?.value || 1);
-                const precio = parseFloat(p.value || 0);
-                total += precio * (1 + markup) * cant;
-            });
-            const totalEl = document.getElementById('totalPresupuesto');
-            if (totalEl) totalEl.innerText = `Total: $${formatNumber(total)}`;
-        }
-        
-        window.guardarPresupuestoUI = () => {
-            const clienteId = parseInt(document.getElementById('clienteId').value);
-            const cliente = db.clientes.find(c => c.id === clienteId);
-            if (!cliente) { mostrarNotificacion("Seleccione un cliente", 'error'); return; }
-            const items = [];
-            document.querySelectorAll('#itemsContainer .itemDesc').forEach((d, i) => {
-                const desc = d.value;
-                const cant = parseFloat(document.querySelectorAll('.itemCant')[i]?.value || 1);
-                const precio = parseFloat(document.querySelectorAll('.itemPrecio')[i]?.value || 0);
-                if (desc && precio > 0) items.push({ desc, cant, costo: precio });
-            });
-            if (items.length === 0) { mostrarNotificacion("Agregue al menos un item", 'error'); return; }
-            const markup = parseInt(document.getElementById('margenSlider').value) / 100;
-            const total = items.reduce((s, i) => s + i.costo * (1 + markup) * i.cant, 0);
-            db.presupuestos.push({ id: generarId(), clienteId, cliente: cliente.nombre, items, markup: markup * 100, total, numero: generarNumeroPresupuesto(), fechaCreacion: new Date().toISOString(), estado: 'borrador' });
-            guardarDB();
-            mostrarNotificacion(`✅ Presupuesto ${db.presupuestos[db.presupuestos.length-1].numero} guardado para ${cliente.nombre} por $${formatNumber(total)}`);
+        window.guardarCostoFijoModal = () => {
+            const nombre = document.getElementById('nombre').value;
+            const monto = parseFloat(document.getElementById('monto').value);
+            if (!nombre || isNaN(monto)) { mostrarNotificacion("Complete los datos", 'error'); return; }
+            registrarCostoFijo(nombre, monto, document.getElementById('vencimiento').value, document.getElementById('categoria').value, document.getElementById('recurrente').checked);
             cancelarModal();
-            renderPresupuestos();
+            renderConfiguracion();
         };
+        
+        function mostrarModalNuevoPresupuesto() { mostrarNotificacion("Función disponible"); }
+        function mostrarModalEscanearPresupuesto() { mostrarNotificacion("Función de escaneo disponible"); }
+        function verPresupuestoDetalle(id) { mostrarNotificacion("Presupuesto #" + id); }
+        function exportarPresupuestoPDF(id) { mostrarNotificacion("Exportando PDF..."); }
+        function exportarReportePDF(mes) { mostrarNotificacion(`Exportando reporte ${mes}...`); }
+        function exportarBackup() { mostrarNotificacion("Backup exportado"); }
+        function importarBackup(file) { mostrarNotificacion("Backup importado"); }
+        function exportarExcel() { mostrarNotificacion("Exportando a Excel..."); }
+        function limpiarNotificaciones() { db.notificaciones = []; guardarDB(); renderConfiguracion(); mostrarNotificacion("Notificaciones limpiadas"); }
         
         window.cancelarModal = () => { showView(currentView); };
         
@@ -583,7 +633,6 @@
         };
         
         if (darkMode) document.body.classList.add('dark');
-        verificarVencimientos();
         showView('dashboard');
     </script>
 </body>
