@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>ERP Contable Argentina - Completo</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/tesseract.js@5/dist/tesseract.min.js"></script>
+    <style>
+        * { -webkit-tap-highlight-color: transparent; }
+        .tab-active { color: #2563eb; border-bottom: 2px solid #2563eb; }
+        .fade-in { animation: fadeIn 0.3s ease; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .modal { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000; }
+        .modal-content { background: white; max-width: 95%; max-height: 90%; overflow: auto; border-radius: 1rem; padding: 1rem; }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <div id="root" class="max-w-7xl mx-auto p-4 pb-24"></div>
+    
+    <nav class="fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg z-50">
+        <div class="flex justify-around max-w-7xl mx-auto">
+            <button onclick="showView('dashboard')" class="tab-btn flex flex-col items-center py-2 px-2 text-gray-500"><span class="text-xl">📊</span><span class="text-xs">Dashboard</span></button>
+            <button onclick="showView('ventas')" class="tab-btn flex flex-col items-center py-2 px-2 text-gray-500"><span class="text-xl">💰</span><span class="text-xs">Ventas</span></button>
+            <button onclick="showView('compras')" class="tab-btn flex flex-col items-center py-2 px-2 text-gray-500"><span class="text-xl">🛒</span><span class="text-xs">Compras</span></button>
+            <button onclick="showView('presupuestos')" class="tab-btn flex flex-col items-center py-2 px-2 text-gray-500"><span class="text-xl">📄</span><span class="text-xs">Presup.</span></button>
+            <button onclick="showView('contador')" class="tab-btn flex flex-col items-center py-2 px-2 text-gray-500"><span class="text-xl">🧮</span><span class="text-xs">Contador</span></button>
+            <button onclick="showView('historial')" class="tab-btn flex flex-col items-center py-2 px-2 text-gray-500"><span class="text-xl">📋</span><span class="text-xs">Historial</span></button>
+        </div>
+    </nav>
+
+    <script>
+        // ========== BASE DE DATOS COMPLETA ==========
+        let db = {
+            ventas: JSON.parse(localStorage.getItem('ventas') || '[]'),
+            compras: JSON.parse(localStorage.getItem('compras') || '[]'),
+            presupuestos: JSON.parse(localStorage.getItem('presupuestos') || '[]'),
+            clientes: JSON.parse(localStorage.getItem('clientes') || '[{"id":1,"nombre":"Cliente Ejemplo SA","cuit":"30-12345678-9","telefono":"11-1234-5678","email":"cliente@mail.com","diasCobro":30},{"id":2,"nombre":"Empresa XYZ","cuit":"30-87654321-0","telefono":"11-8765-4321","email":"xyz@mail.com","diasCobro":15}]'),
+            proveedores: JSON.parse(localStorage.getItem('proveedores') || '[{"id":1,"nombre":"Proveedor Ejemplo","cuit":"30-11111111-1","telefono":"11-1111-1111","contacto":"Juan","diasPago":30}]'),
+            costosFijos: JSON.parse(localStorage.getItem('costosFijos') || '[{"id":1,"nombre":"AFIP Monotributo","monto":32000,"vencimiento":"2025-05-20","estado":"pendiente"},{"id":2,"nombre":"Alquiler","monto":50000,"vencimiento":"2025-05-05","estado":"pendiente"}]')
+        };
+        
+        function guardarDB() {
+            localStorage.setItem('ventas', JSON.stringify(db.ventas));
+            localStorage.setItem('compras', JSON.stringify(db.compras));
+            localStorage.setItem('presupuestos', JSON.stringify(db.presupuestos));
+            localStorage.setItem('clientes', JSON.stringify(db.clientes));
+            localStorage.setItem('proveedores', JSON.stringify(db.proveedores));
+            localStorage.setItem('costosFijos', JSON.stringify(db.costosFijos));
+        }
+        
+        function formatNumber(num) { return num?.toLocaleString('es-AR') || '0'; }
+        function generarId() { return Date.now(); }
+        
+        function calcularDiasRestantes(fecha) {
+            if (!fecha) return null;
+            return Math.ceil((new Date(fecha) - new Date()) / (1000 * 60 * 60 * 24));
+        }
+        
+        // ========== REGISTRAR VENTA COMPLETA ==========
+        function registrarVenta(cliente, montoNeto, iva, tipoComprobante, numComprobante, fechaVenta, diasCobro, comprobanteArchivo) {
+            const ivaMonto = montoNeto * (iva / 100);
+            const total = montoNeto + ivaMonto;
+            const fechaCobroEsperada = new Date(fechaVenta);
+            fechaCobroEsperada.setDate(fechaCobroEsperada.getDate() + diasCobro);
+            
+            const venta = {
+                id: generarId(),
+                cliente, montoNeto, iva, ivaMonto, total, tipoComprobante, numComprobante,
+                fechaVenta, fechaCobroEsperada: fechaCobroEsperada.toISOString().split('T')[0],
+                estado: 'pendiente_cobro', comprobanteArchivo, registrada: new Date().toISOString()
+            };
+            db.ventas.push(venta);
+            guardarDB();
+            return venta;
+        }
+        
+        // ========== REGISTRAR COBRO ==========
+        function registrarCobro(ventaId, fechaCobro, montoCobrado, comprobanteCobro) {
+            const venta = db.ventas.find(v => v.id === ventaId);
+            if (!venta) return false;
+            venta.estado = 'cobrado';
+            venta.fechaCobro = fechaCobro;
+            venta.montoCobrado = montoCobrado;
+            venta.comprobanteCobro = comprobanteCobro;
+            const diasDiferencia = Math.ceil((new Date(fechaCobro) - new Date(venta.fechaCobroEsperada)) / (1000 * 60 * 60 * 24));
+            venta.diasDiferencia = diasDiferencia;
+            venta.estadoPago = diasDiferencia <= 0 ? 'En término' : `Atrasado ${diasDiferencia} días`;
+            guardarDB();
+            return true;
+        }
+        
+        // ========== REGISTRAR COMPRA COMPLETA ==========
+        function registrarCompra(proveedor, montoNeto, iva, tipoComprobante, numComprobante, fechaCompra, diasPago, comprobanteArchivo) {
+            const ivaMonto = montoNeto * (iva / 100);
+            const total = montoNeto + ivaMonto;
+            const fechaPagoEsperada = new Date(fechaCompra);
+            fechaPagoEsperada.setDate(fechaPagoEsperada.getDate() + diasPago);
+            
+            const compra = {
+                id: generarId(),
+                proveedor, montoNeto, iva, ivaMonto, total, tipoComprobante, numComprobante,
+                fechaCompra, fechaPagoEsperada: fechaPagoEsperada.toISOString().split('T')[0],
+                estado: 'pendiente_pago', comprobanteArchivo, registrada: new Date().toISOString()
+            };
+            db.compras.push(compra);
+            guardarDB();
+            return compra;
+        }
+        
+        // ========== REGISTRAR PAGO A PROVEEDOR ==========
+        function registrarPagoCompra(compraId, fechaPago, montoPagado, comprobantePago) {
+            const compra = db.compras.find(c => c.id === compraId);
+            if (!compra) return false;
+            compra.estado = 'pagado';
+            compra.fechaPago = fechaPago;
+            compra.montoPagado = montoPagado;
+            compra.comprobantePago = comprobantePago;
+            const diasDiferencia = Math.ceil((new Date(fechaPago) - new Date(compra.fechaPagoEsperada)) / (1000 * 60 * 60 * 24));
+            compra.diasDiferencia = diasDiferencia;
+            compra.estadoPago = diasDiferencia <= 0 ? 'En término' : `Atrasado ${diasDiferencia} días`;
+            guardarDB();
+            return true;
+        }
+        
+        // ========== CÁLCULOS CONTABLES ==========
+        function calcularContabilidad() {
+            const ventasTotales = db.ventas.reduce((s, v) => s + v.montoNeto, 0);
+            const comprasTotales = db.compras.reduce((s, c) => s + c.montoNeto, 0);
+            const ivaCobrado = db.ventas.reduce((s, v) => s + v.ivaMonto, 0);
+            const ivaPagado = db.compras.reduce((s, c) => s + c.ivaMonto, 0);
+            const ivaAPagar = ivaCobrado - ivaPagado > 0 ? ivaCobrado - ivaPagado : 0;
+            const costosFijosTotal = db.costosFijos.reduce((s, c) => s + c.monto, 0);
+            const gananciaNeta = ventasTotales - comprasTotales - costosFijosTotal - ivaAPagar;
+            const rentabilidad = ventasTotales > 0 ? (gananciaNeta / ventasTotales * 100).toFixed(2) : 0;
+            const porCobrar = db.ventas.filter(v => v.estado === 'pendiente_cobro').reduce((s, v) => s + v.total, 0);
+            const porPagar = db.compras.filter(c => c.estado === 'pendiente_pago').reduce((s, c) => s + c.total, 0);
+            const cajaReal = ventasTotales - comprasTotales - costosFijosTotal - ivaAPagar;
+            
+            return { ventasTotales, comprasTotales, ivaCobrado, ivaPagado, ivaAPagar, costosFijosTotal, gananciaNeta, rentabilidad, porCobrar, porPagar, cajaReal };
+        }
+        
+        // ========== DASHBOARD ==========
+        function renderDashboard() {
+            const c = calcularContabilidad();
+            const ventasPendientes = db.ventas.filter(v => v.estado === 'pendiente_cobro');
+            const comprasPendientes = db.compras.filter(cp => cp.estado === 'pendiente_pago');
+            return `
+                <div class="space-y-4 fade-in pb-24">
+                    <h1 class="text-2xl font-bold text-gray-800">📊 Dashboard</h1>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div class="bg-white p-3 rounded-xl shadow"><p class="text-xs text-gray-500">💰 Ventas Totales</p><p class="text-xl font-bold text-green-600">$${formatNumber(c.ventasTotales)}</p></div>
+                        <div class="bg-white p-3 rounded-xl shadow"><p class="text-xs text-gray-500">📉 Compras Totales</p><p class="text-xl font-bold text-red-600">$${formatNumber(c.comprasTotales)}</p></div>
+                        <div class="bg-white p-3 rounded-xl shadow"><p class="text-xs text-gray-500">📊 Ganancia Neta</p><p class="text-xl font-bold ${c.gananciaNeta >= 0 ? 'text-green-600' : 'text-red-600'}">$${formatNumber(c.gananciaNeta)}</p></div>
+                        <div class="bg-white p-3 rounded-xl shadow"><p class="text-xs text-gray-500">📈 Rentabilidad</p><p class="text-xl font-bold text-purple-600">${c.rentabilidad}%</p></div>
+                        <div class="bg-white p-3 rounded-xl shadow"><p class="text-xs text-gray-500">💵 Por Cobrar</p><p class="text-xl font-bold text-orange-600">$${formatNumber(c.porCobrar)}</p></div>
+                        <div class="bg-white p-3 rounded-xl shadow"><p class="text-xs text-gray-500">💸 Por Pagar</p><p class="text-xl font-bold text-blue-600">$${formatNumber(c.porPagar)}</p></div>
+                    </div>
+                    
+                    <!-- Alertas de cobro -->
+                    <div class="bg-white p-3 rounded-xl shadow">
+                        <h2 class="font-bold text-sm mb-2">🔔 Próximos cobros</h2>
+                        ${ventasPendientes.slice(0, 3).map(v => {
+                            const dias = calcularDiasRestantes(v.fechaCobroEsperada);
+                            return `<div class="flex justify-between text-sm border-b py-1"><span>${v.cliente}</span><span class="${dias < 0 ? 'text-red-600' : dias <= 3 ? 'text-orange-600' : 'text-gray-600'}">$${formatNumber(v.total)} - ${dias < 0 ? `Vencido hace ${Math.abs(dias)}` : dias === 0 ? 'Vence hoy' : `Vence en ${dias} días`}</span></div>`;
+                        }).join('') || '<p class="text-xs text-gray-400">Sin cobros pendientes</p>'}
+                    </div>
+                    
+                    <!-- Alertas de pago -->
+                    <div class="bg-white p-3 rounded-xl shadow">
+                        <h2 class="font-bold text-sm mb-2">⚠️ Próximos pagos</h2>
+                        ${comprasPendientes.slice(0, 3).map(cp => {
+                            const dias = calcularDiasRestantes(cp.fechaPagoEsperada);
+                            return `<div class="flex justify-between text-sm border-b py-1"><span>${cp.proveedor}</span><span class="${dias < 0 ? 'text-red-600' : dias <= 3 ? 'text-orange-600' : 'text-gray-600'}">$${formatNumber(cp.total)} - ${dias < 0 ? `Vencido hace ${Math.abs(dias)}` : dias === 0 ? 'Vence hoy' : `Vence en ${dias} días`}</span></div>`;
+                        }).join('') || '<p class="text-xs text-gray-400">Sin pagos pendientes</p>'}
+                    </div>
+                </div>
+            `;
+        }
+        
+        // ========== VENTAS ==========
+        function renderVentas() {
+            return `
+                <div class="space-y-4 fade-in pb-24">
+                    <div class="flex justify-between"><h1 class="text-2xl font-bold">💰 Ventas</h1><button onclick="modalNuevaVenta()" class="bg-blue-600 text-white px-3 py-1 rounded text-sm">+ Nueva Venta</button></div>
+                    ${db.ventas.map(v => `
+                        <div class="bg-white p-3 rounded-xl shadow">
+                            <div class="flex justify-between"><div><h3 class="font-bold">${v.cliente}</h3><p class="text-sm">Total: $${formatNumber(v.total)} | ${v.tipoComprobante} ${v.numComprobante}</p><p class="text-xs">Fecha venta: ${v.fechaVenta} | Cobro esperado: ${v.fechaCobroEsperada}</p><span class="text-xs px-2 rounded ${v.estado === 'cobrado' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}">${v.estado === 'cobrado' ? `Cobrado ${v.estadoPago || ''}` : 'Pendiente cobro'}</span></div>
+                            <div>${v.estado === 'pendiente_cobro' ? `<button onclick="modalCobrarVenta(${v.id})" class="bg-green-600 text-white px-2 py-1 rounded text-xs">Registrar Cobro</button>` : v.comprobanteCobro ? `<p class="text-xs text-green-600">Comprobante: ${v.comprobanteCobro}</p>` : ''}</div></div>
+                        </div>
+                    `).join('') || '<p class="text-center text-gray-500">No hay ventas registradas</p>'}
+                </div>
+            `;
+        }
+        
+        // ========== COMPRAS ==========
+        function renderCompras() {
+            return `
+                <div class="space-y-4 fade-in pb-24">
+                    <div class="flex justify-between"><h1 class="text-2xl font-bold">🛒 Compras</h1><button onclick="modalNuevaCompra()" class="bg-blue-600 text-white px-3 py-1 rounded text-sm">+ Nueva Compra</button></div>
+                    ${db.compras.map(c => `
+                        <div class="bg-white p-3 rounded-xl shadow">
+                            <div class="flex justify-between"><div><h3 class="font-bold">${c.proveedor}</h3><p class="text-sm">Total: $${formatNumber(c.total)} | ${c.tipoComprobante} ${c.numComprobante}</p><p class="text-xs">Fecha compra: ${c.fechaCompra} | Pago esperado: ${c.fechaPagoEsperada}</p><span class="text-xs px-2 rounded ${c.estado === 'pagado' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}">${c.estado === 'pagado' ? `Pagado ${c.estadoPago || ''}` : 'Pendiente pago'}</span></div>
+                            <div>${c.estado === 'pendiente_pago' ? `<button onclick="modalPagarCompra(${c.id})" class="bg-green-600 text-white px-2 py-1 rounded text-xs">Registrar Pago</button>` : c.comprobantePago ? `<p class="text-xs text-green-600">Comprobante: ${c.comprobantePago}</p>` : ''}</div></div>
+                        </div>
+                    `).join('') || '<p class="text-center text-gray-500">No hay compras registradas</p>'}
+                </div>
+            `;
+        }
+        
+        // ========== PRESUPUESTOS CON VISTA COMPARATIVA ==========
+        let presupuestoOriginal = null;
+        let presupuestoModificado = null;
+        
+        function renderPresupuestos() {
+            return `
+                <div class="space-y-4 fade-in pb-24">
+                    <div class="flex gap-2"><button onclick="modalNuevoPresupuesto()" class="bg-blue-600 text-white px-3 py-1 rounded text-sm">+ Nuevo Presupuesto</button><button onclick="modalEscanearPresupuesto()" class="bg-green-600 text-white px-3 py-1 rounded text-sm">📷 Escanear</button></div>
+                    ${db.presupuestos.map(p => `
+                        <div class="bg-white p-3 rounded-xl shadow">
+                            <div class="flex justify-between"><div><h3 class="font-bold">${p.cliente}</h3><p class="text-sm">Total: $${formatNumber(p.total)} | ${p.items?.length || 0} items</p><p class="text-xs">Fecha: ${p.fechaCreacion?.split('T')[0]}</p><span class="text-xs px-2 rounded ${p.estado === 'aprobado' ? 'bg-green-100' : 'bg-yellow-100'}">${p.estado || 'Borrador'}</span></div><button onclick="verPresupuestoDetalle(${p.id})" class="text-blue-600 text-sm">Ver</button></div>
+                        </div>
+                    `).join('') || '<p class="text-center text-gray-500">No hay presupuestos</p>'}
+                </div>
+            `;
+        }
+        
+        function modalNuevoPresupuesto() {
+            const clienteOptions = db.clientes.map(c => `<option value="${c.nombre}">${c.nombre}</option>`).join('');
+            document.getElementById('root').innerHTML = `
+                <div class="modal"><div class="modal-content w-full max-w-2xl">
+                    <h2 class="text-xl font-bold mb-4">✏️ Nuevo Presupuesto</h2>
+                    <div class="space-y-2">
+                        <input type="text" id="cliente" placeholder="Cliente" list="clientesList" class="w-full p-2 border rounded">
+                        <datalist id="clientesList">${clienteOptions}</datalist>
+                        <div id="itemsContainer"><div class="flex gap-2"><input placeholder="Producto" class="itemDesc flex-1 p-1 border rounded"><input type="number" placeholder="Cant" class="itemCant w-20 p-1 border rounded"><input type="number" placeholder="Precio" class="itemPrecio w-28 p-1 border rounded"><button onclick="this.parentElement.remove()" class="text-red-500">🗑️</button></div></div>
+                        <button onclick="agregarItemPresupuesto()" class="bg-gray-200 p-1 rounded text-sm">+ Agregar item</button>
+                        <div class="mt-2"><label>Margen de ganancia: <span id="margenSpan">30</span>%</label><input type="range" id="margenSlider" min="0" max="200" value="30" class="w-full"></div>
+                        <div id="totalPresupuesto" class="text-right font-bold text-lg">Total: $0</div>
+                        <button onclick="guardarPresupuesto()" class="bg-green-600 text-white p-2 rounded w-full">Guardar Presupuesto</button>
+                        <button onclick="showView('presupuestos')" class="bg-gray-300 p-2 rounded w-full mt-1">Cancelar</button>
+                    </div>
+                </div></div>
+            `;
+            actualizarTotalPresupuesto();
+            document.getElementById('margenSlider').oninput = (e) => { document.getElementById('margenSpan').innerText = e.target.value; actualizarTotalPresupuesto(); };
+        }
+        
+        function agregarItemPresupuesto() {
+            const container = document.getElementById('itemsContainer');
+            const div = document.createElement('div');
+            div.className = 'flex gap-2 mt-1';
+            div.innerHTML = `<input placeholder="Producto" class="itemDesc flex-1 p-1 border rounded"><input type="number" placeholder="Cant" class="itemCant w-20 p-1 border rounded"><input type="number" placeholder="Precio" class="itemPrecio w-28 p-1 border rounded"><button onclick="this.parentElement.remove();actualizarTotalPresupuesto()" class="text-red-500">🗑️</button>`;
+            container.appendChild(div);
+            div.querySelectorAll('input').forEach(i => i.addEventListener('input', () => actualizarTotalPresupuesto()));
+        }
+        
+        function actualizarTotalPresupuesto() {
+            let total = 0;
+            const markup = parseInt(document.getElementById('margenSlider')?.value || 30) / 100;
+            document.querySelectorAll('#itemsContainer .itemPrecio').forEach((p, i) => {
+                const cant = parseFloat(document.querySelectorAll('.itemCant')[i]?.value || 1);
+                const precio = parseFloat(p.value || 0);
+                total += precio * (1 + markup) * cant;
+            });
+            const totalEl = document.getElementById('totalPresupuesto');
+            if (totalEl) totalEl.innerText = `Total: $${formatNumber(total)}`;
+        }
+        
+        function guardarPresupuesto() {
+            const cliente = document.getElementById('cliente').value;
+            if (!cliente) { alert("Ingrese un cliente"); return; }
+            const items = [];
+            document.querySelectorAll('#itemsContainer .itemDesc').forEach((d, i) => {
+                const desc = d.value;
+                const cant = parseFloat(document.querySelectorAll('.itemCant')[i]?.value || 1);
+                const precio = parseFloat(document.querySelectorAll('.itemPrecio')[i]?.value || 0);
+                if (desc && precio > 0) items.push({ desc, cant, costo: precio });
+            });
+            const markup = parseInt(document.getElementById('margenSlider').value) / 100;
+            const total = items.reduce((s, i) => s + i.costo * (1 + markup) * i.cant, 0);
+            db.presupuestos.push({ id: generarId(), cliente, items, markup, total, fechaCreacion: new Date().toISOString(), estado: 'borrador' });
+            guardarDB();
+            alert("✅ Presupuesto guardado");
+            showView('presupuestos');
+        }
+        
+        function modalEscanearPresupuesto() {
+            document.getElementById('root').innerHTML = `
+                <div class="modal"><div class="modal-content w-full max-w-2xl">
+                    <h2 class="text-xl font-bold mb-4">📷 Escanear Presupuesto</h2>
+                    <input type="file" id="fileInput" accept="image/*" class="w-full p-2 border rounded">
+                    <div id="ocrProgress" class="hidden text-blue-600 mt-2">Procesando OCR...</div>
+                    <div id="ocrResultado" class="mt-4"></div>
+                    <button id="aceptarOCR" class="hidden bg-green-600 text-white p-2 rounded w-full mt-2">Editar presupuesto</button>
+                    <button onclick="showView('presupuestos')" class="bg-gray-300 p-2 rounded w-full mt-1">Cancelar</button>
+                </div></div>
+            `;
+            let itemsDetectados = [];
+            const fileInput = document.getElementById('fileInput');
+            const progress = document.getElementById('ocrProgress');
+            const resultado = document.getElementById('ocrResultado');
+            const aceptar = document.getElementById('aceptarOCR');
+            
+            fileInput.onchange = async (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                progress.classList.remove('hidden');
+                try {
+                    const { data: { text } } = await Tesseract.recognize(file, 'spa');
+                    const nums = text.match(/\d{2,6}[.,]?\d{0,2}/g) || [];
+                    const precios = nums.filter(n => { const num = parseFloat(n.replace(',', '.')); return num > 100 && num < 10000000; }).slice(0, 8);
+                    if (precios.length > 0) {
+                        itemsDetectados = precios.map(p => ({ desc: "Item detectado", cant: 1, costo: parseFloat(p.replace(',', '.')) }));
+                        resultado.innerHTML = `<p class="text-green-600">✅ ${precios.length} items detectados</p>` + itemsDetectados.map(i => `<div class="text-sm">${i.desc}: $${i.costo}</div>`).join('');
+                        aceptar.classList.remove('hidden');
+                    } else { resultado.innerHTML = '<p class="text-red-600">No se detectaron precios</p>'; }
+                } catch(err) { resultado.innerHTML = '<p class="text-red-600">Error OCR</p>'; }
+                finally { progress.classList.add('hidden'); }
+            };
+            aceptar.onclick = () => {
+                db.presupuestos.push({ id: generarId(), cliente: "Por definir", items: itemsDetectados, markup: 30, total: itemsDetectados.reduce((s,i)=>s+i.costo*1.3*i.cant,0), fechaCreacion: new Date().toISOString(), estado: 'borrador' });
+                guardarDB();
+                alert("✅ Presupuesto creado desde escaneo");
+                showView('presupuestos');
+            };
+        }
+        
+        function verPresupuestoDetalle(id) {
+            const p = db.presupuestos.find(x => x.id === id);
+            if (!p) return;
+            const markup = p.markup || 30;
+            document.getElementById('root').innerHTML = `
+                <div class="bg-white p-4 rounded-xl pb-24">
+                    <button onclick="showView('presupuestos')" class="text-gray-600 mb-4">← Volver</button>
+                    <h2 class="text-xl font-bold">📄 Presupuesto - ${p.cliente}</h2>
+                    <div class="grid grid-cols-2 gap-2 mt-4">
+                        <div class="border p-2"><h3 class="font-bold text-sm">Original</h3>${p.items.map(i => `<div class="text-sm">${i.desc}: ${i.cant} x $${formatNumber(i.costo)} = $${formatNumber(i.costo * i.cant)}</div>`).join('')}<div class="font-bold mt-2">Total: $${formatNumber(p.items.reduce((s,i)=>s+i.costo*i.cant,0))}</div></div>
+                        <div class="border p-2"><h3 class="font-bold text-sm">Con ${markup}% markup</h3>${p.items.map(i => `<div class="text-sm">${i.desc}: ${i.cant} x $${formatNumber(i.costo*(1+markup/100))} = $${formatNumber(i.costo*(1+markup/100)*i.cant)}</div>`).join('')}<div class="font-bold mt-2 text-green-600">Total: $${formatNumber(p.total)}</div></div>
+                    </div>
+                    <button onclick="convertirPresupuestoAVenta(${id})" class="bg-blue-600 text-white p-2 rounded w-full mt-4">Convertir en Venta</button>
+                </div>
+            `;
+        }
+        
+        function convertirPresupuestoAVenta(id) {
+            const p = db.presupuestos.find(x => x.id === id);
+            if (!p) return;
+            const fecha = new Date().toISOString().split('T')[0];
+            registrarVenta(p.cliente, p.items.reduce((s,i)=>s+i.costo*i.cant,0), 21, "Presupuesto", `P-${p.id}`, fecha, 30, null);
+            alert("✅ Presupuesto convertido a venta");
+            showView('ventas');
+        }
+        
+        // ========== CONTADOR ==========
+        function renderContador() {
+            const c = calcularContabilidad();
+            return `
+                <div class="space-y-4 fade-in pb-24">
+                    <h1 class="text-2xl font-bold">🧮 Contador - Argentina</h1>
+                    <div class="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-4 rounded-xl">
+                        <p class="text-sm">💰 CAPITAL REAL DISPONIBLE</p>
+                        <p class="text-2xl font-bold">$${formatNumber(c.cajaReal)}</p>
+                        <p class="text-xs mt-1">IVA a pagar AFIP: $${formatNumber(c.ivaAPagar)}</p>
+                    </div>
+                    <div class="bg-white p-4 rounded-xl shadow">
+                        <h2 class="font-bold">📊 Estado de Resultados</h2>
+                        <div class="space-y-1 text-sm">
+                            <div class="flex justify-between"><span>Ventas Netas</span><span class="text-green-600">+ $${formatNumber(c.ventasTotales)}</span></div>
+                            <div class="flex justify-between"><span>Compras Netas</span><span class="text-red-600">- $${formatNumber(c.comprasTotales)}</span></div>
+                            <div class="flex justify-between"><span>IVA Cobrado</span><span class="text-orange-600">+ $${formatNumber(c.ivaCobrado)}</span></div>
+                            <div class="flex justify-between"><span>IVA Pagado</span><span class="text-blue-600">- $${formatNumber(c.ivaPagado)}</span></div>
+                            <div class="border-t pt-1 flex justify-between"><span>IVA a Pagar AFIP</span><span class="text-red-600">$${formatNumber(c.ivaAPagar)}</span></div>
+                            <div class="border-t pt-1 flex justify-between"><span>Costos Fijos</span><span class="text-red-600">- $${formatNumber(c.costosFijosTotal)}</span></div>
+                            <div class="border-t-2 pt-2 flex justify-between font-bold text-lg"><span>GANANCIA NETA REAL</span><span class="${c.gananciaNeta >= 0 ? 'text-green-600' : 'text-red-600'}">$${formatNumber(c.gananciaNeta)}</span></div>
+                            <div class="flex justify-between"><span>Rentabilidad Real</span><span class="font-bold">${c.rentabilidad}%</span></div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+        
+        // ========== HISTORIAL ==========
+        function renderHistorial() {
+            return `
+                <div class="space-y-4 fade-in pb-24">
+                    <h1 class="text-2xl font-bold">📋 Historial de Movimientos</h1>
+                    <div class="bg-white p-3 rounded-xl shadow">
+                        <h2 class="font-bold">💰 Ventas</h2>
+                        ${db.ventas.slice().reverse().map(v => `<div class="border-b py-2 text-sm"><span class="font-medium">${v.cliente}</span> - $${formatNumber(v.total)} - ${v.fechaVenta} - ${v.estado === 'cobrado' ? '✓ Cobrado' : '⏳ Pendiente'} ${v.comprobanteCobro ? `(Comprobante: ${v.comprobanteCobro})` : ''}</div>`).join('') || '<p class="text-gray-400">Sin ventas</p>'}
+                    </div>
+                    <div class="bg-white p-3 rounded-xl shadow">
+                        <h2 class="font-bold">🛒 Compras</h2>
+                        ${db.compras.slice().reverse().map(c => `<div class="border-b py-2 text-sm"><span class="font-medium">${c.proveedor}</span> - $${formatNumber(c.total)} - ${c.fechaCompra} - ${c.estado === 'pagado' ? '✓ Pagado' : '⏳ Pendiente'} ${c.comprobantePago ? `(Comprobante: ${c.comprobantePago})` : ''}</div>`).join('') || '<p class="text-gray-400">Sin compras</p>'}
+                    </div>
+                    <div class="bg-white p-3 rounded-xl shadow">
+                        <h2 class="font-bold">📄 Presupuestos</h2>
+                        ${db.presupuestos.slice().reverse().map(p => `<div class="border-b py-2 text-sm"><span class="font-medium">${p.cliente}</span> - $${formatNumber(p.total)} - ${p.fechaCreacion?.split('T')[0]}</div>`).join('') || '<p class="text-gray-400">Sin presupuestos</p>'}
+                    </div>
+                </div>
+            `;
+        }
+        
+        // ========== MODALES ==========
+        function modalNuevaVenta() {
+            const clienteOptions = db.clientes.map(c => `<option value="${c.nombre}|${c.diasCobro}">${c.nombre}</option>`).join('');
+            document.getElementById('root').innerHTML = `
+                <div class="modal"><div class="modal-content w-full max-w-md">
+                    <h2 class="text-xl font-bold mb-4">💰 Nueva Venta</h2>
+                    <div class="space-y-2">
+                        <select id="clienteSelect" class="w-full p-2 border rounded">${clienteOptions}</select>
+                        <input type="number" id="montoNeto" placeholder="Monto Neto (sin IVA)" class="w-full p-2 border rounded">
+                        <select id="ivaSelect" class="w-full p-2 border rounded"><option value="21">IVA 21%</option><option value="10.5">IVA 10.5%</option></select>
+                        <select id="tipoComp" class="w-full p-2 border rounded"><option value="Factura A">Factura A</option><option value="Factura B">Factura B</option><option value="Factura C">Factura C</option></select>
+                        <input type="text" id="numComp" placeholder="Número de comprobante" class="w-full p-2 border rounded">
+                        <input type="date" id="fechaVenta" value="${new Date().toISOString().split('T')[0]}" class="w-full p-2 border rounded">
+                        <input type="text" id="comprobanteArchivo" placeholder="Comprobante (foto o PDF)" class="w-full p-2 border rounded">
+                        <button onclick="guardarVenta()" class="bg-green-600 text-white p-2 rounded w-full">Guardar Venta</button>
+                        <button onclick="showView('ventas')" class="bg-gray-300 p-2 rounded w-full">Cancelar</button>
+                    </div>
+                </div></div>
+            `;
+        }
+        
+        window.guardarVenta = () => {
+            const clienteData = document.getElementById('clienteSelect').value.split('|');
+            const cliente = clienteData[0];
+            const diasCobro = parseInt(clienteData[1]) || 30;
+            const montoNeto = parseFloat(document.getElementById('montoNeto').value);
+            const iva = parseFloat(document.getElementById('ivaSelect').value);
+            const tipoComp = document.getElementById('tipoComp').value;
+            const numComp = document.getElementById('numComp').value;
+            const fechaVenta = document.getElementById('fechaVenta').value;
+            const comprobante = document.getElementById('comprobanteArchivo').value;
+            if (!cliente || isNaN(montoNeto)) { alert("Complete todos los campos"); return; }
+            registrarVenta(cliente, montoNeto, iva, tipoComp, numComp, fechaVenta, diasCobro, comprobante);
+            alert("✅ Venta registrada");
+            showView('ventas');
+        };
+        
+        function modalCobrarVenta(id) {
+            const venta = db.ventas.find(v => v.id === id);
+            document.getElementById('root').innerHTML = `
+                <div class="modal"><div class="modal-content w-full max-w-md">
+                    <h2 class="text-xl font-bold mb-4">💰 Cobrar Venta</h2>
+                    <p>Cliente: ${venta.cliente}</p>
+                    <p>Monto: $${formatNumber(venta.total)}</p>
+                    <input type="date" id="fechaCobro" value="${new Date().toISOString().split('T')[0]}" class="w-full p-2 border rounded my-2">
+                    <input type="number" id="montoCobrado" placeholder="Monto cobrado" value="${venta.total}" class="w-full p-2 border rounded">
+                    <input type="text" id="comprobanteCobro" placeholder="Comprobante / Transferencia Nº" class="w-full p-2 border rounded">
+                    <button onclick="confirmarCobro(${id})" class="bg-green-600 text-white p-2 rounded w-full mt-2">Registrar Cobro</button>
+                    <button onclick="showView('ventas')" class="bg-gray-300 p-2 rounded w-full mt-1">Cancelar</button>
+                </div></div>
+            `;
+        }
+        
+        window.confirmarCobro = (id) => {
+            const fecha = document.getElementById('fechaCobro').value;
+            const monto = parseFloat(document.getElementById('montoCobrado').value);
+            const comprobante = document.getElementById('comprobanteCobro').value;
+            registrarCobro(id, fecha, monto, comprobante);
+            alert("✅ Cobro registrado");
+            showView('ventas');
+        };
+        
+        function modalNuevaCompra() {
+            const proveedorOptions = db.proveedores.map(p => `<option value="${p.nombre}|${p.diasPago}">${p.nombre}</option>`).join('');
+            document.getElementById('root').innerHTML = `
+                <div class="modal"><div class="modal-content w-full max-w-md">
+                    <h2 class="text-xl font-bold mb-4">🛒 Nueva Compra</h2>
+                    <div class="space-y-2">
+                        <select id="proveedorSelect" class="w-full p-2 border rounded">${proveedorOptions}</select>
+                        <input type="number" id="montoNeto" placeholder="Monto Neto (sin IVA)" class="w-full p-2 border rounded">
+                        <select id="ivaSelect" class="w-full p-2 border rounded"><option value="21">IVA 21%</option><option value="10.5">IVA 10.5%</option></select>
+                        <select id="tipoComp" class="w-full p-2 border rounded"><option value="Factura A">Factura A</option><option value="Factura B">Factura B</option></select>
+                        <input type="text" id="numComp" placeholder="Número de comprobante" class="w-full p-2 border rounded">
+                        <input type="date" id="fechaCompra" value="${new Date().toISOString().split('T')[0]}" class="w-full p-2 border rounded">
+                        <input type="text" id="comprobanteArchivo" placeholder="Comprobante recibido" class="w-full p-2 border rounded">
+                        <button onclick="guardarCompra()" class="bg-green-600 text-white p-2 rounded w-full">Guardar Compra</button>
+                        <button onclick="showView('compras')" class="bg-gray-300 p-2 rounded w-full">Cancelar</button>
+                    </div>
+                </div></div>
+            `;
+        }
+        
+        window.guardarCompra = () => {
+            const proveedorData = document.getElementById('proveedorSelect').value.split('|');
+            const proveedor = proveedorData[0];
+            const diasPago = parseInt(proveedorData[1]) || 30;
+            const montoNeto = parseFloat(document.getElementById('montoNeto').value);
+            const iva = parseFloat(document.getElementById('ivaSelect').value);
+            const tipoComp = document.getElementById('tipoComp').value;
+            const numComp = document.getElementById('numComp').value;
+            const fechaCompra = document.getElementById('fechaCompra').value;
+            const comprobante = document.getElementById('comprobanteArchivo').value;
+            if (!proveedor || isNaN(montoNeto)) { alert("Complete todos los campos"); return; }
+            registrarCompra(proveedor, montoNeto, iva, tipoComp, numComp, fechaCompra, diasPago, comprobante);
+            alert("✅ Compra registrada");
+            showView('compras');
+        };
+        
+        function modalPagarCompra(id) {
+            const compra = db.compras.find(c => c.id === id);
+            document.getElementById('root').innerHTML = `
+                <div class="modal"><div class="modal-content w-full max-w-md">
+                    <h2 class="text-xl font-bold mb-4">💰 Pagar Compra</h2>
+                    <p>Proveedor: ${compra.proveedor}</p>
+                    <p>Monto: $${formatNumber(compra.total)}</p>
+                    <input type="date" id="fechaPago" value="${new Date().toISOString().split('T')[0]}" class="w-full p-2 border rounded my-2">
+                    <input type="number" id="montoPagado" placeholder="Monto pagado" value="${compra.total}" class="w-full p-2 border rounded">
+                    <input type="text" id="comprobantePago" placeholder="Comprobante de pago" class="w-full p-2 border rounded">
+                    <button onclick="confirmarPagoCompra(${id})" class="bg-green-600 text-white p-2 rounded w-full mt-2">Registrar Pago</button>
+                    <button onclick="showView('compras')" class="bg-gray-300 p-2 rounded w-full mt-1">Cancelar</button>
+                </div></div>
+            `;
+        }
+        
+        window.confirmarPagoCompra = (id) => {
+            const fecha = document.getElementById('fechaPago').value;
+            const monto = parseFloat(document.getElementById('montoPagado').value);
+            const comprobante = document.getElementById('comprobantePago').value;
+            registrarPagoCompra(id, fecha, monto, comprobante);
+            alert("✅ Pago registrado");
+            showView('compras');
+        };
+        
+        // ========== NAVEGACIÓN ==========
+        window.showView = (view) => {
+            const views = { dashboard: renderDashboard, ventas: renderVentas, compras: renderCompras, presupuestos: renderPresupuestos, contador: renderContador, historial: renderHistorial };
+            document.getElementById('root').innerHTML = views[view]();
+        };
+        
+        showView('dashboard');
+    </script>
+</body>
+</html>
