@@ -1,12 +1,107 @@
-import { cargarDB, initContabilidad } from './modules/contador.js';
+import { cargarDB } from './modules/db.js';
 import { renderDashboard } from './modules/dashboard.js';
-import { renderCostosFijos, initCostosFijosEvents } from './modules/costosFijos.js';
-import { renderProveedores, initProveedoresEvents } from './modules/proveedores.js';
-import { renderClientes, initClientesEvents } from './modules/clientes.js';
+import { renderVentas, initVentasEvents, mostrarModalNuevaVenta, mostrarModalCobrarVenta } from './modules/ventas.js';
+import { renderCompras, initComprasEvents, mostrarModalNuevaCompra, mostrarModalPagarCompra } from './modules/compras.js';
 import { renderPresupuestos, initPresupuestosEvents } from './modules/presupuestos.js';
-import { renderContador, mostrarFormularioCompra, mostrarFormularioVenta, mostrarListaAsientos, actualizarResumenIVA } from './modules/contador.js';
+import { renderReportes, initReportesEvents, cambiarReporteMes, exportarReportePDF } from './modules/reportes.js';
+import { renderContador } from './modules/contador.js';
+import { renderConfiguracion, initConfiguracionEvents } from './modules/configuracion.js';
+import { mostrarNotificacion } from './modules/utils.js';
+
+// Exponer funciones globalmente para los onclick
+window.mostrarModalNuevaVenta = mostrarModalNuevaVenta;
+window.mostrarModalCobrarVenta = mostrarModalCobrarVenta;
+window.mostrarModalNuevaCompra = mostrarModalNuevaCompra;
+window.mostrarModalPagarCompra = mostrarModalPagarCompra;
+window.mostrarNotificacion = mostrarNotificacion;
+window.cambiarReporteMes = cambiarReporteMes;
+window.exportarReportePDF = exportarReportePDF;
+
+window.filtrarVentas = () => {
+    const select = document.getElementById('mesSelectVentas');
+    if (select) localStorage.setItem('ventasMesFiltro', select.value);
+    window.dispatchEvent(new Event('refreshView'));
+};
+
+window.filtrarCompras = () => {
+    const select = document.getElementById('mesSelectCompras');
+    if (select) localStorage.setItem('comprasMesFiltro', select.value);
+    window.dispatchEvent(new Event('refreshView'));
+};
+
 let currentView = 'dashboard';
-async function renderView() { const root = document.getElementById('root'); let html = ''; if(currentView==='dashboard') html=renderDashboard(); else if(currentView==='costos') html=renderCostosFijos(); else if(currentView==='proveedores') html=renderProveedores(); else if(currentView==='clientes') html=renderClientes(); else if(currentView==='presupuestos') html=renderPresupuestos(); else if(currentView==='contador') html=renderContador(); else html=renderDashboard(); if(root) root.innerHTML=html; if(currentView==='costos') initCostosFijosEvents(); if(currentView==='proveedores') initProveedoresEvents(); if(currentView==='clientes') initClientesEvents(); if(currentView==='presupuestos') initPresupuestosEvents(); if(currentView==='contador'){ document.getElementById('btnCompra')?.addEventListener('click',()=>mostrarFormularioCompra()); document.getElementById('btnVenta')?.addEventListener('click',()=>mostrarFormularioVenta()); document.getElementById('btnAsientos')?.addEventListener('click',()=>mostrarListaAsientos()); } }
-function initNavigation(){ const views=[{id:'navDashboard',view:'dashboard'},{id:'navCostosFijos',view:'costos'},{id:'navProveedores',view:'proveedores'},{id:'navClientes',view:'clientes'},{id:'navPresupuestos',view:'presupuestos'},{id:'navContador',view:'contador'}]; views.forEach(v=>{ const btn=document.getElementById(v.id); if(btn) btn.addEventListener('click',()=>{ currentView=v.view; renderView(); }); }); }
-window.addEventListener('refreshView',()=>{ actualizarResumenIVA(); renderView(); });
-initContabilidad(); cargarDB(); initNavigation(); renderView();
+
+async function renderView() {
+    const root = document.getElementById('root');
+    if (!root) return;
+    
+    if (currentView === 'dashboard') root.innerHTML = renderDashboard();
+    else if (currentView === 'ventas') root.innerHTML = renderVentas();
+    else if (currentView === 'compras') root.innerHTML = renderCompras();
+    else if (currentView === 'presupuestos') root.innerHTML = renderPresupuestos();
+    else if (currentView === 'reportes') root.innerHTML = renderReportes();
+    else if (currentView === 'contador') root.innerHTML = renderContador();
+    else if (currentView === 'configuracion') root.innerHTML = renderConfiguracion();
+    else root.innerHTML = renderDashboard();
+    
+    // Inicializar eventos específicos de cada vista
+    if (currentView === 'ventas') initVentasEvents();
+    if (currentView === 'compras') initComprasEvents();
+    if (currentView === 'presupuestos') initPresupuestosEvents();
+    if (currentView === 'reportes') initReportesEvents();
+    if (currentView === 'configuracion') initConfiguracionEvents();
+}
+
+function initNavigation() {
+    const navButtons = document.querySelectorAll('[data-view]');
+    navButtons.forEach(btn => {
+        btn.addEventListener('click', () => {
+            currentView = btn.dataset.view;
+            renderView();
+        });
+    });
+}
+
+function initPWA() {
+    let deferredPrompt;
+    const banner = document.getElementById('installBanner');
+    const installBtn = document.getElementById('installApp');
+    const closeBtn = document.getElementById('closeBanner');
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+    
+    if (!isStandalone && !localStorage.getItem('hideInstallBanner')) {
+        setTimeout(() => banner?.classList.remove('-translate-y-full'), 2000);
+    }
+    
+    window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        deferredPrompt = e;
+        banner?.classList.remove('-translate-y-full');
+    });
+    
+    installBtn?.addEventListener('click', async () => {
+        if (deferredPrompt) {
+            deferredPrompt.prompt();
+            const { outcome } = await deferredPrompt.userChoice;
+            if (outcome === 'accepted') banner.classList.add('-translate-y-full');
+            deferredPrompt = null;
+        }
+    });
+    
+    closeBtn?.addEventListener('click', () => {
+        banner.classList.add('-translate-y-full');
+        localStorage.setItem('hideInstallBanner', 'true');
+    });
+    
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/sw.js').catch(err => console.log('SW error:', err));
+    }
+}
+
+window.showView = (view) => { currentView = view; renderView(); };
+window.addEventListener('refreshView', () => renderView());
+
+cargarDB();
+initNavigation();
+initPWA();
+renderView();

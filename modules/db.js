@@ -1,5 +1,39 @@
-let db = { costosFijos: [], proveedores: [], clientes: [], presupuestos: [], pagosHistorial: [], compras: [], ventas: [], asientosContables: [], planCuentas: [], percepciones: [], resumenIVA: { creditoFiscal:0, debitoFiscal:0, ivaAPagar:0, periodo:"" } };
-export function cargarDB() { db = { costosFijos: JSON.parse(localStorage.getItem('costosFijos')||'[]'), proveedores: JSON.parse(localStorage.getItem('proveedores')||'[]'), clientes: JSON.parse(localStorage.getItem('clientes')||'[]'), presupuestos: JSON.parse(localStorage.getItem('presupuestos')||'[]'), pagosHistorial: JSON.parse(localStorage.getItem('pagosHistorial')||'[]'), compras: JSON.parse(localStorage.getItem('compras')||'[]'), ventas: JSON.parse(localStorage.getItem('ventas')||'[]'), asientosContables: JSON.parse(localStorage.getItem('asientosContables')||'[]'), planCuentas: JSON.parse(localStorage.getItem('planCuentas')||'[]'), percepciones: JSON.parse(localStorage.getItem('percepciones')||'[]'), resumenIVA: JSON.parse(localStorage.getItem('resumenIVA')||'{"creditoFiscal":0,"debitoFiscal":0,"ivaAPagar":0,"periodo":""}') }; if(db.costosFijos.length===0){ db.costosFijos=[{id:1,nombre:"AFIP Monotributo",monto:32000,vencimiento:"2025-05-20",estado:"pendiente"},{id:2,nombre:"Banco Galicia",monto:8900,vencimiento:"2025-05-10",estado:"pagado"},{id:3,nombre:"Celular",monto:5500,vencimiento:"2025-05-15",estado:"pendiente"}]; db.clientes=[{id:1,nombre:"Empresa Cliente SA",cuit:"30-12345678-9",email:"cliente@mail.com",telefono:"11-1234-5678",diasPago:30},{id:2,nombre:"Servicios TECH SRL",cuit:"30-87654321-0",email:"tech@mail.com",telefono:"11-8765-4321",diasPago:15}]; db.proveedores=[{id:1,nombre:"Insumos del Oeste",cuit:"30-11111111-1",contacto:"Juan",telefono:"11-1111-1111",diasPago:30}]; guardarDB();} return db; }
-export function guardarDB() { localStorage.setItem('costosFijos',JSON.stringify(db.costosFijos)); localStorage.setItem('proveedores',JSON.stringify(db.proveedores)); localStorage.setItem('clientes',JSON.stringify(db.clientes)); localStorage.setItem('presupuestos',JSON.stringify(db.presupuestos)); localStorage.setItem('pagosHistorial',JSON.stringify(db.pagosHistorial)); localStorage.setItem('compras',JSON.stringify(db.compras)); localStorage.setItem('ventas',JSON.stringify(db.ventas)); localStorage.setItem('asientosContables',JSON.stringify(db.asientosContables)); localStorage.setItem('planCuentas',JSON.stringify(db.planCuentas)); localStorage.setItem('percepciones',JSON.stringify(db.percepciones)); localStorage.setItem('resumenIVA',JSON.stringify(db.resumenIVA)); }
+let db = {
+    empresas: [], empresaActiva: 1, ventas: [], compras: [], presupuestos: [],
+    clientes: [], proveedores: [], costosFijos: [], pagosHistorial: [],
+    categoriasGastos: ['Impuestos', 'Servicios', 'Alquiler', 'Sueldos', 'Bancos'],
+    notificaciones: [], proximoNumPresupuesto: 1001
+};
+export function cargarDB() {
+    db = {
+        empresas: JSON.parse(localStorage.getItem('empresas') || '[{"id":1,"nombre":"Mi Empresa SRL","cuit":"30-12345678-9","direccion":"Av. Corrientes 123","telefono":"11-1234-5678","email":"info@miempresa.com","logo":"🏢","whatsapp":"5491112345678"}]'),
+        empresaActiva: JSON.parse(localStorage.getItem('empresaActiva') || '1'),
+        ventas: JSON.parse(localStorage.getItem('ventas') || '[]'),
+        compras: JSON.parse(localStorage.getItem('compras') || '[]'),
+        presupuestos: JSON.parse(localStorage.getItem('presupuestos') || '[]'),
+        clientes: JSON.parse(localStorage.getItem('clientes') || '[{"id":1,"nombre":"Cliente Ejemplo SA","cuit":"30-12345678-9","telefono":"11-1234-5678","email":"cliente@mail.com","direccion":"Av. Santa Fe 123","contacto":"Juan Pérez","diasCobro":30,"saldo":0,"whatsapp":"5491112345678"}]'),
+        proveedores: JSON.parse(localStorage.getItem('proveedores') || '[{"id":1,"nombre":"Proveedor Ejemplo","cuit":"30-11111111-1","telefono":"11-1111-1111","email":"proveedor@mail.com","direccion":"Belgrano 789","contacto":"Carlos Gómez","diasPago":30,"saldo":0}]'),
+        costosFijos: JSON.parse(localStorage.getItem('costosFijos') || '[{"id":1,"nombre":"AFIP Monotributo","monto":32000,"vencimiento":"2025-05-20","estado":"pendiente","categoria":"Impuestos","recurrente":true}]'),
+        pagosHistorial: JSON.parse(localStorage.getItem('pagosHistorial') || '[]'),
+        categoriasGastos: JSON.parse(localStorage.getItem('categoriasGastos') || '["Impuestos","Servicios","Alquiler","Sueldos","Bancos"]'),
+        notificaciones: JSON.parse(localStorage.getItem('notificaciones') || '[]'),
+        proximoNumPresupuesto: JSON.parse(localStorage.getItem('proximoNumPresupuesto') || '1001')
+    };
+    return db;
+}
+export function guardarDB() {
+    localStorage.setItem('empresas', JSON.stringify(db.empresas));
+    localStorage.setItem('empresaActiva', JSON.stringify(db.empresaActiva));
+    localStorage.setItem('ventas', JSON.stringify(db.ventas));
+    localStorage.setItem('compras', JSON.stringify(db.compras));
+    localStorage.setItem('presupuestos', JSON.stringify(db.presupuestos));
+    localStorage.setItem('clientes', JSON.stringify(db.clientes));
+    localStorage.setItem('proveedores', JSON.stringify(db.proveedores));
+    localStorage.setItem('costosFijos', JSON.stringify(db.costosFijos));
+    localStorage.setItem('pagosHistorial', JSON.stringify(db.pagosHistorial));
+    localStorage.setItem('categoriasGastos', JSON.stringify(db.categoriasGastos));
+    localStorage.setItem('notificaciones', JSON.stringify(db.notificaciones));
+    localStorage.setItem('proximoNumPresupuesto', JSON.stringify(db.proximoNumPresupuesto));
+}
 export function getDB() { return db; }
 export function setDB(nueva) { db = nueva; guardarDB(); }

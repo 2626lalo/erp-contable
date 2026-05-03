@@ -3,14 +3,14 @@ FROM node:18-alpine
 # Instalar Tesseract para OCR
 RUN apk add --no-cache tesseract-ocr
 
+# Instalar servidor web
+RUN npm install -g http-server
+
 # Crear directorio de trabajo
 WORKDIR /app
 
-# Copiar archivos
+# Copiar todos los archivos
 COPY . .
-
-# Instalar http-server
-RUN npm install -g http-server
 
 # Exponer puerto
 EXPOSE 8080

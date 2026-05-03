@@ -1,3 +1,16 @@
-const CACHE_NAME = 'erp-v1';
-self.addEventListener('install', e => e.waitUntil(caches.open(CACHE_NAME).then(c => c.addAll(['/','/index.html','/manifest.json']))));
-self.addEventListener('fetch', e => e.respondWith(caches.match(e.request).then(r => r || fetch(e.request))));
+const CACHE_NAME = 'erp-contable-v4';
+const urlsToCache = ['/', '/index.html', '/manifest.json', '/styles.css', '/app.js'];
+
+self.addEventListener('install', event => {
+    event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(urlsToCache)));
+    self.skipWaiting();
+});
+
+self.addEventListener('fetch', event => {
+    event.respondWith(caches.match(event.request).then(response => response || fetch(event.request)));
+});
+
+self.addEventListener('activate', event => {
+    event.waitUntil(caches.keys().then(cacheNames => Promise.all(cacheNames.filter(name => name !== CACHE_NAME).map(name => caches.delete(name)))));
+    self.clients.claim();
+});

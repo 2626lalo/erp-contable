@@ -1,10 +1,10 @@
 {
   "name": "erp-contable",
-  "version": "1.0.0",
-  "description": "ERP Contable Argentina",
+  "version": "4.0.0",
+  "description": "ERP Contable Argentina - Sistema profesional",
   "main": "index.html",
   "scripts": {
-    "start": "npx http-server -p 8080 -c-1"
+    "start": "npx http-server -p 8080 -c-1 --cors"
   },
   "dependencies": {
     "http-server": "^14.1.1"
