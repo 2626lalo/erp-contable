@@ -8,19 +8,15 @@ import { renderContador } from './modules/contador.js';
 import { renderConfiguracion, initConfiguracionEvents, agregarBotonActualizacion } from './modules/configuracion.js';
 import { mostrarNotificacion } from './modules/utils.js';
 
-// ========== CONTROL DE VERSIONES ==========
-const APP_VERSION = '4.3.2';
+const APP_VERSION = '4.5.4';
 const VERSION_KEY = 'app_version';
 
-// Forzar recarga si hay nueva versión
 function checkAndForceUpdate() {
     const savedVersion = localStorage.getItem(VERSION_KEY);
     if (savedVersion && savedVersion !== APP_VERSION) {
         localStorage.setItem(VERSION_KEY, APP_VERSION);
         mostrarNotificacion(`🔄 Nueva versión ${APP_VERSION}. Recargando...`, 'info');
-        setTimeout(() => {
-            window.location.reload(true);
-        }, 1500);
+        setTimeout(() => window.location.reload(true), 1500);
         return true;
     } else if (!savedVersion) {
         localStorage.setItem(VERSION_KEY, APP_VERSION);
@@ -28,72 +24,19 @@ function checkAndForceUpdate() {
     return false;
 }
 
-// Verificar versión en el servidor (comparar con archivo)
-async function verificarVersionServidor() {
-    try {
-        const response = await fetch('/version.json?t=' + Date.now());
-        if (response.ok) {
-            const data = await response.json();
-            if (data.version && data.version !== APP_VERSION) {
-                mostrarNotificacion(`🔄 Nueva versión ${data.version} disponible. Actualizando...`, 'info');
-                localStorage.setItem(VERSION_KEY, data.version);
-                setTimeout(() => window.location.reload(true), 1500);
-            }
-        }
-    } catch (error) {
-        console.log('No se pudo verificar versión en servidor');
-    }
-}
-
-function registerSW() {
-    if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('/sw.js?v=' + APP_VERSION)
-            .then(registration => {
-                console.log('Service Worker registrado:', registration);
-                
-                navigator.serviceWorker.addEventListener('message', event => {
-                    if (event.data && event.data.type === 'UPDATE_AVAILABLE') {
-                        mostrarNotificacion('🔄 Nueva versión disponible. Actualizando...', 'info');
-                        setTimeout(() => window.location.reload(true), 1500);
-                    }
-                });
-                
-                // Verificar actualizaciones cada 30 segundos
-                setInterval(() => {
-                    registration.update();
-                }, 30000);
-            })
-            .catch(error => console.log('Service Worker error:', error));
-    }
-}
-
 window.forzarActualizacion = async () => {
     mostrarNotificacion("🔍 Buscando actualizaciones...", 'info');
-    
     try {
-        if ('serviceWorker' in navigator) {
-            const registrations = await navigator.serviceWorker.getRegistrations();
-            for (const registration of registrations) {
-                await registration.update();
-            }
-        }
-        
         if ('caches' in window) {
             const cacheNames = await caches.keys();
             await Promise.all(cacheNames.map(name => caches.delete(name)));
         }
-        
-        setTimeout(() => {
-            window.location.reload(true);
-        }, 1000);
-        
+        setTimeout(() => window.location.reload(true), 1000);
     } catch (error) {
-        console.error('Error al actualizar:', error);
-        mostrarNotificacion("Error al actualizar. Recargá manualmente.", 'error');
+        mostrarNotificacion("Error al actualizar", 'error');
     }
 };
 
-// Exponer funciones globales
 window.mostrarModalNuevaVenta = mostrarModalNuevaVenta;
 window.mostrarModalCobrarVenta = mostrarModalCobrarVenta;
 window.mostrarModalNuevaCompra = mostrarModalNuevaCompra;
@@ -101,7 +44,6 @@ window.mostrarModalPagarCompra = mostrarModalPagarCompra;
 window.mostrarNotificacion = mostrarNotificacion;
 window.cambiarReporteMes = cambiarReporteMes;
 window.exportarReportePDF = exportarReportePDF;
-window.forzarActualizacion = window.forzarActualizacion;
 
 window.filtrarVentas = () => {
     const select = document.getElementById('mesSelectVentas');
@@ -185,15 +127,8 @@ function initPWA() {
 window.showView = (view) => { currentView = view; renderView(); };
 window.addEventListener('refreshView', () => renderView());
 
-// Inicializar
 cargarDB();
 initNavigation();
 initPWA();
-registerSW();
-
-// Verificar actualizaciones
-if (!checkAndForceUpdate()) {
-    verificarVersionServidor();
-}
-
+checkAndForceUpdate();
 renderView();

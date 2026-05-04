@@ -1,0 +1,5 @@
+{
+    "version": "4.5.3",
+    "fecha": "2025-05-04",
+    "cambios": "Fix memoria insuficiente: compresión extrema (600px, 40% calidad) para CamScanner"
+}

@@ -1,0 +1,326 @@
+// Módulo profesional de procesamiento de documentos estilo CamScanner
+// Requiere OpenCV.js
+
+let cvReady = false;
+let pendingCallbacks = [];
+
+export function initOpenCV() {
+    return new Promise((resolve) => {
+        if (cvReady) {
+            resolve();
+            return;
+        }
+        
+        // Verificar si OpenCV ya está cargado
+        if (typeof cv !== 'undefined' && cv && cv.imread) {
+            cvReady = true;
+            console.log("OpenCV ya estaba cargado");
+            resolve();
+            return;
+        }
+        
+        console.log("Cargando OpenCV.js...");
+        
+        // Cargar OpenCV.js dinámicamente desde CDN oficial
+        const script = document.createElement('script');
+        script.src = 'https://docs.opencv.org/4.8.0/opencv.js';
+        script.async = true;
+        script.onload = () => {
+            console.log("Script OpenCV.js cargado, esperando inicialización...");
+            // Esperar a que OpenCV esté listo
+            const checkInterval = setInterval(() => {
+                if (typeof cv !== 'undefined' && cv.imread) {
+                    clearInterval(checkInterval);
+                    cvReady = true;
+                    console.log("OpenCV.js inicializado correctamente");
+                    pendingCallbacks.forEach(cb => cb());
+                    pendingCallbacks = [];
+                    resolve();
+                }
+            }, 100);
+            
+            // Timeout después de 10 segundos
+            setTimeout(() => {
+                if (!cvReady) {
+                    console.error("Timeout cargando OpenCV.js");
+                    resolve(); // Resolver de todas formas para no bloquear
+                }
+            }, 10000);
+        };
+        script.onerror = () => {
+            console.error("Error cargando OpenCV.js");
+            resolve();
+        };
+        document.head.appendChild(script);
+    });
+}
+
+// Función para enderezar el documento (Warp Perspective)
+function enderezarDocumento(src, puntos) {
+    // Ordenar puntos: top-left, top-right, bottom-right, bottom-left
+    const puntosArray = [];
+    for (let i = 0; i < 4; i++) {
+        puntosArray.push({ x: puntos.data32S[i * 2], y: puntos.data32S[i * 2 + 1] });
+    }
+    
+    puntosArray.sort((a, b) => a.y - b.y);
+    const arriba = puntosArray.slice(0, 2).sort((a, b) => a.x - b.x);
+    const abajo = puntosArray.slice(2, 4).sort((a, b) => a.x - b.x);
+    
+    const pts1 = cv.matFromArray(4, 1, cv.CV_32FC2, [
+        arriba[0].x, arriba[0].y,
+        arriba[1].x, arriba[1].y,
+        abajo[1].x, abajo[1].y,
+        abajo[0].x, abajo[0].y
+    ]);
+    
+    const ancho = Math.max(arriba[1].x - arriba[0].x, abajo[1].x - abajo[0].x);
+    const alto = Math.max(abajo[0].y - arriba[0].y, abajo[1].y - arriba[1].y);
+    
+    const pts2 = cv.matFromArray(4, 1, cv.CV_32FC2, [
+        0, 0,
+        ancho, 0,
+        ancho, alto,
+        0, alto
+    ]);
+    
+    const M = cv.getPerspectiveTransform(pts1, pts2);
+    const dsize = new cv.Size(ancho, alto);
+    const warped = new cv.Mat();
+    cv.warpPerspective(src, warped, M, dsize, cv.INTER_LINEAR, cv.BORDER_CONSTANT, new cv.Scalar());
+    
+    M.delete();
+    pts1.delete();
+    pts2.delete();
+    
+    return warped;
+}
+
+// Función para detectar y enderezar automáticamente el documento
+export async function detectarYEnderezarDocumento(canvasId, progressCallback) {
+    return new Promise(async (resolve) => {
+        if (!cvReady) {
+            await initOpenCV();
+        }
+        
+        if (!cvReady || typeof cv === 'undefined' || !cv.imread) {
+            console.warn("OpenCV no disponible, usando imagen original");
+            progressCallback?.("⚠️ OpenCV no disponible", 100);
+            const canvas = document.getElementById(canvasId);
+            resolve(canvas);
+            return;
+        }
+        
+        progressCallback?.("📐 Detectando bordes del documento...", 20);
+        
+        try {
+            let src = cv.imread(canvasId);
+            let gray = new cv.Mat();
+            let edges = new cv.Mat();
+            let hierarchy = new cv.Mat();
+            let contours = new cv.MatVector();
+            
+            // Convertir a grises
+            cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY, 0);
+            
+            // Reducir ruido
+            cv.GaussianBlur(gray, gray, new cv.Size(5, 5), 0);
+            
+            // Detectar bordes con Canny
+            cv.Canny(gray, edges, 75, 200);
+            
+            // Encontrar contornos
+            cv.findContours(edges, contours, hierarchy, cv.RETR_LIST, cv.CHAIN_APPROX_SIMPLE);
+            
+            // Buscar el contorno más grande con 4 puntos
+            let maxArea = 0;
+            let mejorContorno = null;
+            
+            for (let i = 0; i < contours.size(); i++) {
+                let cnt = contours.get(i);
+                let area = cv.contourArea(cnt);
+                if (area > 1000 && area > maxArea) {
+                    let peri = cv.arcLength(cnt, true);
+                    let approx = new cv.Mat();
+                    cv.approxPolyDP(cnt, approx, 0.02 * peri, true);
+                    if (approx.rows === 4) {
+                        maxArea = area;
+                        mejorContorno = approx.clone();
+                    }
+                    approx.delete();
+                }
+            }
+            
+            progressCallback?.("✂️ Enderezando documento...", 60);
+            
+            let resultado;
+            if (mejorContorno && mejorContorno.rows === 4) {
+                try {
+                    resultado = enderezarDocumento(src, mejorContorno);
+                    mejorContorno.delete();
+                } catch(e) {
+                    console.error("Error al enderezar:", e);
+                    resultado = src.clone();
+                }
+            } else {
+                resultado = src.clone();
+            }
+            
+            // Limpiar memoria
+            src.delete();
+            gray.delete();
+            edges.delete();
+            hierarchy.delete();
+            contours.delete();
+            
+            if (mejorContorno) mejorContorno.delete();
+            
+            // Mostrar resultado en canvas
+            cv.imshow(canvasId, resultado);
+            
+            progressCallback?.("✅ Documento enderezado", 80);
+            
+            resolve(resultado);
+        } catch (error) {
+            console.error("Error en detección de bordes:", error);
+            progressCallback?.("⚠️ No se pudo enderezar, continuando con imagen original", 80);
+            const canvas = document.getElementById(canvasId);
+            resolve(canvas);
+        }
+    });
+}
+
+// Función para limpiar y optimizar texto (Adaptive Thresholding)
+export async function limpiarTextoParaOCR(canvasId, progressCallback) {
+    return new Promise(async (resolve) => {
+        if (!cvReady) {
+            await initOpenCV();
+        }
+        
+        if (!cvReady || typeof cv === 'undefined' || !cv.imread) {
+            console.warn("OpenCV no disponible, usando imagen original");
+            progressCallback?.("⚠️ OpenCV no disponible", 100);
+            const canvas = document.getElementById(canvasId);
+            resolve(canvas);
+            return;
+        }
+        
+        progressCallback?.("🔍 Mejorando calidad del texto...", 85);
+        
+        try {
+            let src = cv.imread(canvasId);
+            let gray = new cv.Mat();
+            let dst = new cv.Mat();
+            
+            // Convertir a grises
+            cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY, 0);
+            
+            // Aplicar GaussianBlur para reducir ruido
+            cv.GaussianBlur(gray, gray, new cv.Size(3, 3), 0);
+            
+            // Adaptive Thresholding (el truco de CamScanner)
+            cv.adaptiveThreshold(
+                gray, 
+                dst, 
+                255, 
+                cv.ADAPTIVE_THRESH_GAUSSIAN_C, 
+                cv.THRESH_BINARY, 
+                15,  // Tamaño del bloque
+                10   // Constante que se resta de la media
+            );
+            
+            // Opcional: Dilatar ligeramente las letras para mejor OCR
+            let kernel = cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(1, 1));
+            cv.dilate(dst, dst, kernel, new cv.Point(-1, -1), 1);
+            kernel.delete();
+            
+            // Mostrar resultado
+            cv.imshow(canvasId, dst);
+            
+            // Limpiar memoria
+            src.delete();
+            gray.delete();
+            
+            progressCallback?.("✅ Texto optimizado para OCR", 95);
+            
+            resolve(dst);
+        } catch (error) {
+            console.error("Error en limpieza de texto:", error);
+            progressCallback?.("⚠️ No se pudo optimizar texto", 95);
+            const canvas = document.getElementById(canvasId);
+            resolve(canvas);
+        }
+    });
+}
+
+// Función completa de procesamiento profesional
+export async function procesarDocumentoProfesional(canvasId, onProgress) {
+    return new Promise(async (resolve) => {
+        await initOpenCV();
+        
+        onProgress?.("📸 Procesando documento...", 10);
+        
+        // Paso 1: Detectar y enderezar
+        await detectarYEnderezarDocumento(canvasId, (msg, progress) => {
+            onProgress?.(msg, progress);
+        });
+        
+        // Paso 2: Limpiar texto
+        await limpiarTextoParaOCR(canvasId, (msg, progress) => {
+            onProgress?.(msg, progress);
+        });
+        
+        // Obtener el canvas procesado
+        const canvas = document.getElementById(canvasId);
+        const imagenProcesada = canvas.toDataURL('image/jpeg', 0.9);
+        
+        onProgress?.("✅ Procesamiento completado", 100);
+        
+        resolve(imagenProcesada);
+    });
+}
+
+// Función de extracción de texto (OCR)
+export async function extraerTextoOCR(canvasId, onProgress) {
+    return new Promise(async (resolve) => {
+        onProgress?.("🔍 Iniciando OCR...", 0);
+        
+        try {
+            const worker = await Tesseract.createWorker('spa');
+            
+            onProgress?.("📖 Leyendo texto...", 30);
+            
+            const canvas = document.getElementById(canvasId);
+            const { data: { text } } = await worker.recognize(canvas);
+            
+            onProgress?.("📝 Procesando resultados...", 80);
+            
+            await worker.terminate();
+            
+            // Extraer precios del texto
+            const nums = text.match(/\d{2,6}[.,]?\d{0,2}/g) || [];
+            const precios = nums.filter(n => {
+                const num = parseFloat(n.replace(',', '.'));
+                return num > 100 && num < 10000000;
+            }).slice(0, 10);
+            
+            const items = precios.map(p => ({
+                desc: "Item detectado",
+                cant: 1,
+                costo: parseFloat(p.replace(',', '.'))
+            }));
+            
+            onProgress?.("✅ Texto extraído correctamente", 100);
+            
+            resolve({
+                textoCompleto: text,
+                items: items,
+                precios: precios
+            });
+        } catch (error) {
+            console.error("Error en OCR:", error);
+            onProgress?.("❌ Error en OCR", 100);
+            resolve({ textoCompleto: "", items: [], precios: [] });
+        }
+    });
+}
