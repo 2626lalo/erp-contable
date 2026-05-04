@@ -529,3 +529,21 @@ export function agregarBotonActualizacion() {
         container.insertAdjacentHTML('beforeend', btnHtml);
     }
 }
+
+// Agregar botón de actualización en la sección de configuración
+export function agregarBotonActualizacion() {
+    const container = document.querySelector('.bg-white.dark\\:bg-gray-800.rounded-2xl.p-5.shadow-lg:has(h2:contains("💾 Backup"))') || 
+                     document.querySelector('.bg-white.dark\\:bg-gray-800.rounded-2xl.p-5.shadow-lg');
+    if (container && !document.getElementById('btnActualizacionManual')) {
+        const btnHtml = `
+            <div class="mt-4 pt-3 border-t dark:border-gray-700">
+                <button id="btnActualizacionManual" onclick="window.forzarActualizacion()" class="w-full bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-xl transition-all flex items-center justify-center gap-2">
+                    🔄 Buscar actualizaciones
+                </button>
+                <p class="text-xs text-gray-400 text-center mt-2">Versión actual: ${localStorage.getItem('app_version') || '4.3.2'}</p>
+                <p class="text-xs text-gray-500 text-center mt-1">La app se actualiza automáticamente al abrirse</p>
+            </div>
+        `;
+        container.insertAdjacentHTML('beforeend', btnHtml);
+    }
+}

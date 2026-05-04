@@ -7,6 +7,12 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="MiERP">
     <meta name="theme-color" content="#1e3a8a">
+    
+    <!-- Anti-caché meta tags -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    
     <link rel="manifest" href="/manifest.json">
     <link rel="apple-touch-icon" href="https://emojicdn.elk.sh/📊?size=192">
     <title>ERP Contable Argentina</title>
@@ -15,7 +21,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="styles.css?v=4.3.2">
     <style>
         .nav-container {
             position: fixed;
@@ -102,11 +108,31 @@
         .dark .version-text {
             color: #6b7280;
         }
+        /* Indicador de carga de nueva versión */
+        .update-toast {
+            position: fixed;
+            bottom: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #1e3a8a;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 50px;
+            font-size: 14px;
+            z-index: 200;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            cursor: pointer;
+            animation: slideUp 0.3s ease;
+        }
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateX(-50%) translateY(20px); }
+            to { opacity: 1; transform: translateX(-50%) translateY(0); }
+        }
     </style>
 </head>
 <body class="bg-gray-50 dark:bg-gray-900">
     <div id="notificationContainer"></div>
-    <div id="root" class="max-w-7xl mx-auto p-4 pb-24"></div>
+    <div id="root" class="max-w-7xl mx-auto p-4 pb-28"></div>
     
     <div class="version-text" id="versionText">Cargando...</div>
     
@@ -159,13 +185,28 @@
         </div>
     </div>
 
-    <script type="module" src="app.js"></script>
+    <script type="module" src="app.js?v=4.3.2"></script>
     <script>
-        // Mostrar versión desde localStorage
+        // Detectar si hay nueva versión al cargar la página
+        const VERSION = '4.3.2';
+        const savedVersion = localStorage.getItem('app_version');
+        
+        if (savedVersion && savedVersion !== VERSION) {
+            localStorage.setItem('app_version', VERSION);
+            const toast = document.createElement('div');
+            toast.className = 'update-toast';
+            toast.innerHTML = '🔄 Nueva versión disponible. Actualizando...';
+            document.body.appendChild(toast);
+            setTimeout(() => {
+                window.location.reload(true);
+            }, 2000);
+        } else if (!savedVersion) {
+            localStorage.setItem('app_version', VERSION);
+        }
+        
         setTimeout(() => {
-            const version = localStorage.getItem('app_version') || '4.3.1';
             const versionEl = document.getElementById('versionText');
-            if (versionEl) versionEl.innerText = `📱 ERP Contable v${version}`;
+            if (versionEl) versionEl.innerText = `📱 ERP Contable v${VERSION}`;
         }, 500);
         
         setTimeout(() => {
@@ -179,6 +220,21 @@
                 const indicator = document.getElementById('scrollIndicator');
                 if (indicator) indicator.classList.add('hide');
             });
+        }
+        
+        // Forzar recarga con F5 o gesto de recarga
+        window.addEventListener('beforeunload', function() {
+            localStorage.setItem('app_last_version', VERSION);
+        });
+        
+        // Detectar si es la primera carga después de un despliegue
+        if (performance.navigation && performance.navigation.type === 1) {
+            console.log('Página recargada manualmente - verificando actualizaciones');
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.getRegistrations().then(registrations => {
+                    registrations.forEach(reg => reg.update());
+                });
+            }
         }
     </script>
 </body>

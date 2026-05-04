@@ -12,55 +12,56 @@ import { mostrarNotificacion } from './modules/utils.js';
 const APP_VERSION = '4.3.2';
 const VERSION_KEY = 'app_version';
 
-// Verificar nueva versión al cargar la app
-async function verificarNuevaVersion() {
+// Forzar recarga si hay nueva versión
+function checkAndForceUpdate() {
+    const savedVersion = localStorage.getItem(VERSION_KEY);
+    if (savedVersion && savedVersion !== APP_VERSION) {
+        localStorage.setItem(VERSION_KEY, APP_VERSION);
+        mostrarNotificacion(`🔄 Nueva versión ${APP_VERSION}. Recargando...`, 'info');
+        setTimeout(() => {
+            window.location.reload(true);
+        }, 1500);
+        return true;
+    } else if (!savedVersion) {
+        localStorage.setItem(VERSION_KEY, APP_VERSION);
+    }
+    return false;
+}
+
+// Verificar versión en el servidor (comparar con archivo)
+async function verificarVersionServidor() {
     try {
-        // Forzar recarga del Service Worker
-        if ('serviceWorker' in navigator) {
-            const registrations = await navigator.serviceWorker.getRegistrations();
-            for (const registration of registrations) {
-                await registration.update();
+        const response = await fetch('/version.json?t=' + Date.now());
+        if (response.ok) {
+            const data = await response.json();
+            if (data.version && data.version !== APP_VERSION) {
+                mostrarNotificacion(`🔄 Nueva versión ${data.version} disponible. Actualizando...`, 'info');
+                localStorage.setItem(VERSION_KEY, data.version);
+                setTimeout(() => window.location.reload(true), 1500);
             }
         }
-        
-        const savedVersion = localStorage.getItem(VERSION_KEY);
-        if (savedVersion && savedVersion !== APP_VERSION) {
-            mostrarNotificacion(`🔄 Nueva versión ${APP_VERSION} disponible. Actualizando...`, 'info');
-            localStorage.setItem(VERSION_KEY, APP_VERSION);
-            setTimeout(() => {
-                window.location.reload();
-            }, 1500);
-        } else if (!savedVersion) {
-            localStorage.setItem(VERSION_KEY, APP_VERSION);
-            mostrarNotificacion(`📱 ERP Contable v${APP_VERSION}`, 'info');
-        } else if (savedVersion === APP_VERSION) {
-            console.log(`✅ Versión actual: ${APP_VERSION}`);
-        }
     } catch (error) {
-        console.log('Error verificando versión:', error);
+        console.log('No se pudo verificar versión en servidor');
     }
 }
 
 function registerSW() {
     if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('/sw.js')
+        navigator.serviceWorker.register('/sw.js?v=' + APP_VERSION)
             .then(registration => {
                 console.log('Service Worker registrado:', registration);
                 
-                // Escuchar mensajes del Service Worker
                 navigator.serviceWorker.addEventListener('message', event => {
                     if (event.data && event.data.type === 'UPDATE_AVAILABLE') {
                         mostrarNotificacion('🔄 Nueva versión disponible. Actualizando...', 'info');
-                        setTimeout(() => window.location.reload(), 1500);
+                        setTimeout(() => window.location.reload(true), 1500);
                     }
                 });
                 
-                // Verificar actualizaciones cada 60 segundos
+                // Verificar actualizaciones cada 30 segundos
                 setInterval(() => {
-                    registration.update().then(() => {
-                        console.log('Verificando actualizaciones...');
-                    });
-                }, 60000);
+                    registration.update();
+                }, 30000);
             })
             .catch(error => console.log('Service Worker error:', error));
     }
@@ -70,7 +71,6 @@ window.forzarActualizacion = async () => {
     mostrarNotificacion("🔍 Buscando actualizaciones...", 'info');
     
     try {
-        // 1. Limpiar caché del Service Worker
         if ('serviceWorker' in navigator) {
             const registrations = await navigator.serviceWorker.getRegistrations();
             for (const registration of registrations) {
@@ -78,13 +78,11 @@ window.forzarActualizacion = async () => {
             }
         }
         
-        // 2. Limpiar caché del navegador
         if ('caches' in window) {
             const cacheNames = await caches.keys();
             await Promise.all(cacheNames.map(name => caches.delete(name)));
         }
         
-        // 3. Recargar la página
         setTimeout(() => {
             window.location.reload(true);
         }, 1000);
@@ -95,6 +93,7 @@ window.forzarActualizacion = async () => {
     }
 };
 
+// Exponer funciones globales
 window.mostrarModalNuevaVenta = mostrarModalNuevaVenta;
 window.mostrarModalCobrarVenta = mostrarModalCobrarVenta;
 window.mostrarModalNuevaCompra = mostrarModalNuevaCompra;
@@ -102,6 +101,7 @@ window.mostrarModalPagarCompra = mostrarModalPagarCompra;
 window.mostrarNotificacion = mostrarNotificacion;
 window.cambiarReporteMes = cambiarReporteMes;
 window.exportarReportePDF = exportarReportePDF;
+window.forzarActualizacion = window.forzarActualizacion;
 
 window.filtrarVentas = () => {
     const select = document.getElementById('mesSelectVentas');
@@ -191,7 +191,9 @@ initNavigation();
 initPWA();
 registerSW();
 
-// Verificar versión al cargar
-verificarNuevaVersion();
+// Verificar actualizaciones
+if (!checkAndForceUpdate()) {
+    verificarVersionServidor();
+}
 
 renderView();

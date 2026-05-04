@@ -1,15 +1,15 @@
-const CACHE_NAME = 'erp-contable-v4';
+const CACHE_NAME = 'erp-contable-v4_3_2';
 const urlsToCache = [
     '/',
     '/index.html',
     '/manifest.json',
     '/styles.css',
-    '/app.js'
+    '/app.js',
+    '/version.json'
 ];
 
-// Instalar nueva versión
 self.addEventListener('install', event => {
-    console.log('[Service Worker] Instalando nueva versión...');
+    console.log('[SW] Instalando nueva versión...');
     event.waitUntil(
         caches.open(CACHE_NAME)
             .then(cache => cache.addAll(urlsToCache))
@@ -17,22 +17,19 @@ self.addEventListener('install', event => {
     );
 });
 
-// Activar y limpiar caché vieja
 self.addEventListener('activate', event => {
-    console.log('[Service Worker] Activando y limpiando caché vieja...');
+    console.log('[SW] Activando y limpiando caché vieja...');
     event.waitUntil(
         caches.keys().then(cacheNames => {
             return Promise.all(
                 cacheNames.map(cache => {
                     if (cache !== CACHE_NAME) {
-                        console.log('[Service Worker] Eliminando caché:', cache);
+                        console.log('[SW] Eliminando caché:', cache);
                         return caches.delete(cache);
                     }
                 })
             );
         }).then(() => {
-            console.log('[Service Worker] Notificando a clientes para actualizar...');
-            // Notificar a todos los clientes que hay nueva versión
             self.clients.matchAll().then(clients => {
                 clients.forEach(client => {
                     client.postMessage({ type: 'UPDATE_AVAILABLE', version: CACHE_NAME });
@@ -43,7 +40,6 @@ self.addEventListener('activate', event => {
     );
 });
 
-// Interceptar fetch y servir desde caché
 self.addEventListener('fetch', event => {
     event.respondWith(
         caches.match(event.request)
@@ -65,7 +61,6 @@ self.addEventListener('fetch', event => {
     );
 });
 
-// Escuchar mensajes desde la app
 self.addEventListener('message', event => {
     if (event.data && event.data.type === 'SKIP_WAITING') {
         self.skipWaiting();
