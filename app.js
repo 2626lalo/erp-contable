@@ -5,28 +5,40 @@ import { renderCompras, initComprasEvents, mostrarModalNuevaCompra, mostrarModal
 import { renderPresupuestos, initPresupuestosEvents } from './modules/presupuestos.js';
 import { renderReportes, initReportesEvents, cambiarReporteMes, exportarReportePDF } from './modules/reportes.js';
 import { renderContador } from './modules/contador.js';
-import { renderConfiguracion, initConfiguracionEvents } from './modules/configuracion.js';
+import { renderConfiguracion, initConfiguracionEvents, agregarBotonActualizacion } from './modules/configuracion.js';
 import { mostrarNotificacion } from './modules/utils.js';
 
 // ========== CONTROL DE VERSIONES ==========
-// v4.3.1 - 03/05/2025: Editor de imagen mejorado con recorte, zoom, brillo, contraste. Flujo simplificado
-const APP_VERSION = '4.3.1';
+const APP_VERSION = '4.3.2';
 const VERSION_KEY = 'app_version';
 
-function checkForUpdates() {
-    const savedVersion = localStorage.getItem(VERSION_KEY);
-    if (savedVersion && savedVersion !== APP_VERSION) {
-        mostrarNotificacion(`🔄 Nueva versión ${APP_VERSION} disponible. Actualizando...`, 'info');
-        localStorage.setItem(VERSION_KEY, APP_VERSION);
-        setTimeout(() => {
-            if (confirm('Se ha detectado una nueva versión. ¿Desea recargar la app para actualizar?')) {
-                window.location.reload();
+// Verificar nueva versión al cargar la app
+async function verificarNuevaVersion() {
+    try {
+        // Forzar recarga del Service Worker
+        if ('serviceWorker' in navigator) {
+            const registrations = await navigator.serviceWorker.getRegistrations();
+            for (const registration of registrations) {
+                await registration.update();
             }
-        }, 2000);
-    } else if (!savedVersion) {
-        localStorage.setItem(VERSION_KEY, APP_VERSION);
+        }
+        
+        const savedVersion = localStorage.getItem(VERSION_KEY);
+        if (savedVersion && savedVersion !== APP_VERSION) {
+            mostrarNotificacion(`🔄 Nueva versión ${APP_VERSION} disponible. Actualizando...`, 'info');
+            localStorage.setItem(VERSION_KEY, APP_VERSION);
+            setTimeout(() => {
+                window.location.reload();
+            }, 1500);
+        } else if (!savedVersion) {
+            localStorage.setItem(VERSION_KEY, APP_VERSION);
+            mostrarNotificacion(`📱 ERP Contable v${APP_VERSION}`, 'info');
+        } else if (savedVersion === APP_VERSION) {
+            console.log(`✅ Versión actual: ${APP_VERSION}`);
+        }
+    } catch (error) {
+        console.log('Error verificando versión:', error);
     }
-    console.log(`📱 ERP Contable - Versión ${APP_VERSION}`);
 }
 
 function registerSW() {
@@ -34,29 +46,52 @@ function registerSW() {
         navigator.serviceWorker.register('/sw.js')
             .then(registration => {
                 console.log('Service Worker registrado:', registration);
+                
+                // Escuchar mensajes del Service Worker
                 navigator.serviceWorker.addEventListener('message', event => {
                     if (event.data && event.data.type === 'UPDATE_AVAILABLE') {
                         mostrarNotificacion('🔄 Nueva versión disponible. Actualizando...', 'info');
                         setTimeout(() => window.location.reload(), 1500);
                     }
                 });
-                setInterval(() => registration.update(), 30000);
+                
+                // Verificar actualizaciones cada 60 segundos
+                setInterval(() => {
+                    registration.update().then(() => {
+                        console.log('Verificando actualizaciones...');
+                    });
+                }, 60000);
             })
             .catch(error => console.log('Service Worker error:', error));
     }
 }
 
-window.forzarActualizacion = () => {
-    if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.getRegistration().then(registration => {
-            if (registration) {
-                registration.update();
-                mostrarNotificacion('🔍 Buscando actualizaciones...', 'info');
-                setTimeout(() => window.location.reload(), 1000);
+window.forzarActualizacion = async () => {
+    mostrarNotificacion("🔍 Buscando actualizaciones...", 'info');
+    
+    try {
+        // 1. Limpiar caché del Service Worker
+        if ('serviceWorker' in navigator) {
+            const registrations = await navigator.serviceWorker.getRegistrations();
+            for (const registration of registrations) {
+                await registration.update();
             }
-        });
-    } else {
-        window.location.reload();
+        }
+        
+        // 2. Limpiar caché del navegador
+        if ('caches' in window) {
+            const cacheNames = await caches.keys();
+            await Promise.all(cacheNames.map(name => caches.delete(name)));
+        }
+        
+        // 3. Recargar la página
+        setTimeout(() => {
+            window.location.reload(true);
+        }, 1000);
+        
+    } catch (error) {
+        console.error('Error al actualizar:', error);
+        mostrarNotificacion("Error al actualizar. Recargá manualmente.", 'error');
     }
 };
 
@@ -92,7 +127,10 @@ async function renderView() {
     else if (currentView === 'presupuestos') root.innerHTML = renderPresupuestos();
     else if (currentView === 'reportes') root.innerHTML = renderReportes();
     else if (currentView === 'contador') root.innerHTML = renderContador();
-    else if (currentView === 'configuracion') root.innerHTML = renderConfiguracion();
+    else if (currentView === 'configuracion') {
+        root.innerHTML = renderConfiguracion();
+        setTimeout(() => agregarBotonActualizacion(), 100);
+    }
     else root.innerHTML = renderDashboard();
     
     if (currentView === 'ventas') initVentasEvents();
@@ -147,9 +185,13 @@ function initPWA() {
 window.showView = (view) => { currentView = view; renderView(); };
 window.addEventListener('refreshView', () => renderView());
 
+// Inicializar
 cargarDB();
 initNavigation();
 initPWA();
 registerSW();
-checkForUpdates();
+
+// Verificar versión al cargar
+verificarNuevaVersion();
+
 renderView();
