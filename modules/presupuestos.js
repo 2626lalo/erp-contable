@@ -8,6 +8,42 @@ let markupActual = 30;
 let imagenOriginal = null;
 let datosOCRCompletos = null;
 
+// Función para comprimir imagen antes de usarla
+function comprimirImagenPrevia(file, maxWidth = 1024, calidad = 0.7) {
+    return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const img = new Image();
+            img.onload = () => {
+                let width = img.width;
+                let height = img.height;
+                
+                if (width > maxWidth) {
+                    height = (height * maxWidth) / width;
+                    width = maxWidth;
+                }
+                
+                const canvas = document.createElement('canvas');
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, width, height);
+                
+                canvas.toBlob((blob) => {
+                    resolve({
+                        blob: blob,
+                        url: canvas.toDataURL('image/jpeg', calidad),
+                        width: width,
+                        height: height
+                    });
+                }, 'image/jpeg', calidad);
+            };
+            img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+    });
+}
+
 export function renderPresupuestos() {
     const db = getDB();
     return `
@@ -40,7 +76,6 @@ export function renderPresupuestos() {
             </div>
         </div>`;
     
-    // Configurar el botón de escanear directo
     setTimeout(() => {
         const btnEscanear = document.getElementById('btnEscanearDirecto');
         if (btnEscanear) {
@@ -49,31 +84,30 @@ export function renderPresupuestos() {
     }, 100);
 }
 
-function iniciarCapturaImagen() {
-    // Crear input file oculto que permite cámara o galería
+async function iniciarCapturaImagen() {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'image/*';
-    input.capture = 'environment'; // Esto abre la cámara directamente en móviles
+    input.capture = 'environment';
     
     input.onchange = async (e) => {
         const file = e.target.files[0];
         if (!file) return;
         
-        // Mostrar loading
-        mostrarNotificacion("📸 Procesando imagen...", 'info');
+        mostrarNotificacion("📸 Comprimiendo imagen...", 'info');
         
-        // Leer la imagen y abrir el editor directamente
-        const reader = new FileReader();
-        reader.onload = (ev) => {
-            const imagenUrl = ev.target.result;
-            // Abrir editor de imagen directamente (sin modales intermedios)
-            mostrarEditorImagen(imagenUrl, async (imagenEditada) => {
-                // Una vez editada, procesar OCR
+        try {
+            // Comprimir imagen antes de mostrarla
+            const imagenComprimida = await comprimirImagenPrevia(file, 1024, 0.7);
+            
+            // Mostrar editor con la imagen comprimida
+            mostrarEditorImagen(imagenComprimida.url, async (imagenEditada) => {
                 await procesarOCRConImagenEditada(imagenEditada);
             });
-        };
-        reader.readAsDataURL(file);
+        } catch (error) {
+            console.error('Error al comprimir:', error);
+            mostrarNotificacion("Error al procesar la imagen", 'error');
+        }
     };
     
     input.click();
@@ -88,14 +122,13 @@ window.mostrarModalNuevoPresupuesto = () => {
 };
 
 async function procesarOCRConImagenEditada(imagenEditada) {
-    // Mostrar progreso en una notificación
     mostrarNotificacion("🔄 Procesando OCR...", 'info');
     
     try {
+        // Convertir dataURL a blob
         const blob = await (await fetch(imagenEditada)).blob();
         
         const resultado = await procesarImagenOCR(blob, (texto, porcentaje) => {
-            // Actualizar progreso silenciosamente
             console.log(`${texto}: ${porcentaje}%`);
         });
         
@@ -142,15 +175,6 @@ function mostrarEditorPresupuestoDosColumnas(datosOCR = null) {
                         <div class="bg-gray-100 dark:bg-gray-900 rounded-xl p-4 min-h-[400px] flex items-center justify-center overflow-auto">
                             ${imagenOriginal ? `<img src="${imagenOriginal}" class="max-w-full object-contain rounded shadow">` : '<p class="text-gray-400 text-center">No hay imagen escaneada.</p>'}
                         </div>
-                        ${datosOCR?.datosCompletos ? `
-                        <div class="mt-3 text-xs text-gray-500 bg-gray-50 dark:bg-gray-900 p-2 rounded">
-                            <p class="font-bold">📋 Datos detectados:</p>
-                            ${datosOCR.facturaNumero ? `<p>Factura: ${datosOCR.facturaNumero}</p>` : ''}
-                            ${datosOCR.facturaTipo ? `<p>Tipo: ${datosOCR.facturaTipo}</p>` : ''}
-                            ${datosOCR.fechaEmision ? `<p>Fecha: ${datosOCR.fechaEmision}</p>` : ''}
-                            ${datosOCR.totalDetectado ? `<p>Total detectado: $${formatNumber(datosOCR.totalDetectado)}</p>` : ''}
-                        </div>
-                        ` : ''}
                     </div>
                     
                     <div class="lg:w-1/2 p-4">
@@ -310,7 +334,7 @@ function renderizarTablaItemsDosColumnas() {
         <tr class="bg-gray-50 dark:bg-gray-700 font-bold">
             <td colspan="4" class="p-3 text-right">TOTAL PRESUPUESTO:</td>
             <td class="p-3 text-green-700 dark:text-green-400 text-lg">$${formatNumber(total)}</td>
-            <td></td>
+            <tr><td></td></td>
         </tr>
     `;
 }
@@ -320,7 +344,7 @@ function mostrarVistaPreviaPDF(clienteNombre, fechaVencimiento, total, numero, e
     const itemsHTML = items.map(item => {
         const precioVenta = item.costo * (1 + markup/100);
         const subtotal = precioVenta * item.cant;
-        return `<tr><td style="padding: 8px; border-bottom: 1px solid #ddd;">${escapeHtml(item.desc)}</td><td style="padding: 8px; text-align: center;">${item.cant}</td><td style="padding: 8px; text-align: right;">$${formatNumber(item.costo)}</td><td style="padding: 8px; text-align: right;">$${formatNumber(precioVenta)}</td><td style="padding: 8px; text-align: right;">$${formatNumber(subtotal)}</td>`).join('');
+        return `<tr><td style="padding: 8px; border-bottom: 1px solid #ddd;">${escapeHtml(item.desc)}</td><td style="padding: 8px; text-align: center;">${item.cant}</td><td style="padding: 8px; text-align: right;">$${formatNumber(item.costo)}</td><td style="padding: 8px; text-align: right;">$${formatNumber(precioVenta)}</td><td style="padding: 8px; text-align: right;">$${formatNumber(subtotal)}</td></tr>`;
     }).join('');
     
     const content = `

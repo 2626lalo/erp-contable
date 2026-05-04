@@ -1,10 +1,10 @@
-// Editor de imagen interactivo - Versión mejorada
+// Editor de imagen interactivo con compresión avanzada
 export function mostrarEditorImagen(imagenUrl, onConfirmar) {
     let escala = 1;
     let brillo = 0;
     let contraste = 0;
     let imagenRecortada = null;
-    let fase = 'seleccion'; // 'seleccion' o 'edicion'
+    let fase = 'seleccion';
     let inicioSeleccion = { x: 0, y: 0 };
     let finSeleccion = { x: 0, y: 0 };
     let isDrawing = false;
@@ -48,13 +48,38 @@ export function mostrarEditorImagen(imagenUrl, onConfirmar) {
     canvasEditor = document.getElementById('editorCanvas');
     ctx = canvasEditor.getContext('2d');
     
+    // Cargar imagen con compresión al cargar
     const img = new Image();
     img.onload = () => {
-        imgOriginal = img;
-        canvasEditor.width = img.width;
-        canvasEditor.height = img.height;
-        dibujarImagen();
-        iniciarEventosCanvas();
+        // Redimensionar si es muy grande (máx 1200px)
+        let width = img.width;
+        let height = img.height;
+        const maxDimension = 1200;
+        
+        if (width > maxDimension || height > maxDimension) {
+            if (width > height) {
+                height = (height * maxDimension) / width;
+                width = maxDimension;
+            } else {
+                width = (width * maxDimension) / height;
+                height = maxDimension;
+            }
+        }
+        
+        const canvasTemp = document.createElement('canvas');
+        canvasTemp.width = width;
+        canvasTemp.height = height;
+        const ctxTemp = canvasTemp.getContext('2d');
+        ctxTemp.drawImage(img, 0, 0, width, height);
+        
+        imgOriginal = new Image();
+        imgOriginal.onload = () => {
+            canvasEditor.width = imgOriginal.width;
+            canvasEditor.height = imgOriginal.height;
+            dibujarImagen();
+            iniciarEventosCanvas();
+        };
+        imgOriginal.src = canvasTemp.toDataURL('image/jpeg', 0.8);
     };
     img.src = imagenUrl;
     
@@ -128,7 +153,6 @@ export function mostrarEditorImagen(imagenUrl, onConfirmar) {
         
         canvasEditor.addEventListener('mouseup', () => { isDrawing = false; });
         
-        // Touch events
         canvasEditor.addEventListener('touchstart', (e) => {
             e.preventDefault();
             if (fase !== 'seleccion') return;
@@ -192,21 +216,12 @@ export function mostrarEditorImagen(imagenUrl, onConfirmar) {
             document.getElementById('contrasteValue').innerText = 0;
             aplicarFiltrosEdicion();
         };
-        nuevaImagen.src = canvasRecorte.toDataURL('image/jpeg', 0.95);
+        nuevaImagen.src = canvasRecorte.toDataURL('image/jpeg', 0.85);
     }
     
-    // Eventos de los botones
     document.getElementById('recortarBtn').onclick = realizarRecorte;
-    
-    document.getElementById('resetSeleccionBtn').onclick = () => {
-        areaSeleccionada = null;
-        dibujarImagen();
-    };
-    
-    document.getElementById('cancelarBtn').onclick = () => {
-        modal.remove();
-    };
-    
+    document.getElementById('resetSeleccionBtn').onclick = () => { areaSeleccionada = null; dibujarImagen(); };
+    document.getElementById('cancelarBtn').onclick = () => { modal.remove(); };
     document.getElementById('volverSeleccionBtn').onclick = () => {
         fase = 'seleccion';
         document.getElementById('faseTitulo').innerText = '✂️ Seleccionar área a recortar';
@@ -216,38 +231,10 @@ export function mostrarEditorImagen(imagenUrl, onConfirmar) {
         canvasEditor.height = imgOriginal.height;
         dibujarImagen();
     };
-    
-    document.getElementById('zoomSlider').oninput = (e) => {
-        escala = parseInt(e.target.value);
-        document.getElementById('zoomValue').innerText = escala;
-        if (fase === 'edicion') aplicarFiltrosEdicion();
-    };
-    
-    document.getElementById('brilloSlider').oninput = (e) => {
-        brillo = parseInt(e.target.value);
-        document.getElementById('brilloValue').innerText = brillo;
-        if (fase === 'edicion') aplicarFiltrosEdicion();
-    };
-    
-    document.getElementById('contrasteSlider').oninput = (e) => {
-        contraste = parseInt(e.target.value);
-        document.getElementById('contrasteValue').innerText = contraste;
-        if (fase === 'edicion') aplicarFiltrosEdicion();
-    };
-    
-    document.getElementById('autoFixBtn').onclick = () => {
-        brillo = 20;
-        contraste = 30;
-        escala = 120;
-        document.getElementById('brilloSlider').value = 20;
-        document.getElementById('contrasteSlider').value = 30;
-        document.getElementById('zoomSlider').value = 120;
-        document.getElementById('brilloValue').innerText = 20;
-        document.getElementById('contrasteValue').innerText = 30;
-        document.getElementById('zoomValue').innerText = 120;
-        if (fase === 'edicion') aplicarFiltrosEdicion();
-    };
-    
+    document.getElementById('zoomSlider').oninput = (e) => { escala = parseInt(e.target.value); document.getElementById('zoomValue').innerText = escala; if (fase === 'edicion') aplicarFiltrosEdicion(); };
+    document.getElementById('brilloSlider').oninput = (e) => { brillo = parseInt(e.target.value); document.getElementById('brilloValue').innerText = brillo; if (fase === 'edicion') aplicarFiltrosEdicion(); };
+    document.getElementById('contrasteSlider').oninput = (e) => { contraste = parseInt(e.target.value); document.getElementById('contrasteValue').innerText = contraste; if (fase === 'edicion') aplicarFiltrosEdicion(); };
+    document.getElementById('autoFixBtn').onclick = () => { brillo = 20; contraste = 30; escala = 120; document.getElementById('brilloSlider').value = 20; document.getElementById('contrasteSlider').value = 30; document.getElementById('zoomSlider').value = 120; document.getElementById('brilloValue').innerText = 20; document.getElementById('contrasteValue').innerText = 30; document.getElementById('zoomValue').innerText = 120; if (fase === 'edicion') aplicarFiltrosEdicion(); };
     document.getElementById('confirmarBtn').onclick = () => {
         const canvasFinal = document.createElement('canvas');
         let imgFinal;
@@ -258,7 +245,6 @@ export function mostrarEditorImagen(imagenUrl, onConfirmar) {
             const ctxFinal = canvasFinal.getContext('2d');
             ctxFinal.drawImage(imagenRecortada, 0, 0);
             
-            // Aplicar filtros finales
             const imageData = ctxFinal.getImageData(0, 0, canvasFinal.width, canvasFinal.height);
             const data = imageData.data;
             const ajusteContraste = (259 * (contraste + 255)) / (255 * (259 - contraste));
@@ -271,14 +257,13 @@ export function mostrarEditorImagen(imagenUrl, onConfirmar) {
                 data[i + 2] = Math.min(255, Math.max(0, ajusteContraste * (b - 128) + 128));
             }
             ctxFinal.putImageData(imageData, 0, 0);
-            imgFinal = canvasFinal.toDataURL('image/jpeg', 0.95);
+            imgFinal = canvasFinal.toDataURL('image/jpeg', 0.8);
         } else {
-            imgFinal = canvasEditor.toDataURL('image/jpeg', 0.95);
+            imgFinal = canvasEditor.toDataURL('image/jpeg', 0.8);
         }
         
         modal.remove();
         onConfirmar(imgFinal);
     };
-    
     document.getElementById('closeEditorBtn').onclick = () => modal.remove();
 }
