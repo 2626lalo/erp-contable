@@ -511,3 +511,21 @@ export function initConfiguracionEvents() {
     const darkMode = localStorage.getItem('darkMode') === 'true';
     if (darkMode) document.body.classList.add('dark');
 }
+
+// Agregar botón de actualización en la sección de configuración
+// Buscar la sección de Backup y agregar después:
+
+export function agregarBotonActualizacion() {
+    const container = document.querySelector('.bg-white.dark\\:bg-gray-800.rounded-2xl.p-5.shadow-lg:has(h2:contains("💾 Backup"))');
+    if (container) {
+        const btnHtml = `
+            <div class="mt-3">
+                <button onclick="window.forzarActualizacion()" class="w-full bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-xl transition-all flex items-center justify-center gap-2">
+                    🔄 Buscar actualizaciones
+                </button>
+                <p class="text-xs text-gray-400 text-center mt-1">Versión actual: ${localStorage.getItem('app_version') || '4.2.0'}</p>
+            </div>
+        `;
+        container.insertAdjacentHTML('beforeend', btnHtml);
+    }
+}

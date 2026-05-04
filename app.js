@@ -8,7 +8,58 @@ import { renderContador } from './modules/contador.js';
 import { renderConfiguracion, initConfiguracionEvents } from './modules/configuracion.js';
 import { mostrarNotificacion } from './modules/utils.js';
 
-// Exponer funciones globalmente para los onclick
+// ========== CONTROL DE VERSIONES ==========
+// v4.3.1 - 03/05/2025: Editor de imagen mejorado con recorte, zoom, brillo, contraste. Flujo simplificado
+const APP_VERSION = '4.3.1';
+const VERSION_KEY = 'app_version';
+
+function checkForUpdates() {
+    const savedVersion = localStorage.getItem(VERSION_KEY);
+    if (savedVersion && savedVersion !== APP_VERSION) {
+        mostrarNotificacion(`🔄 Nueva versión ${APP_VERSION} disponible. Actualizando...`, 'info');
+        localStorage.setItem(VERSION_KEY, APP_VERSION);
+        setTimeout(() => {
+            if (confirm('Se ha detectado una nueva versión. ¿Desea recargar la app para actualizar?')) {
+                window.location.reload();
+            }
+        }, 2000);
+    } else if (!savedVersion) {
+        localStorage.setItem(VERSION_KEY, APP_VERSION);
+    }
+    console.log(`📱 ERP Contable - Versión ${APP_VERSION}`);
+}
+
+function registerSW() {
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/sw.js')
+            .then(registration => {
+                console.log('Service Worker registrado:', registration);
+                navigator.serviceWorker.addEventListener('message', event => {
+                    if (event.data && event.data.type === 'UPDATE_AVAILABLE') {
+                        mostrarNotificacion('🔄 Nueva versión disponible. Actualizando...', 'info');
+                        setTimeout(() => window.location.reload(), 1500);
+                    }
+                });
+                setInterval(() => registration.update(), 30000);
+            })
+            .catch(error => console.log('Service Worker error:', error));
+    }
+}
+
+window.forzarActualizacion = () => {
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistration().then(registration => {
+            if (registration) {
+                registration.update();
+                mostrarNotificacion('🔍 Buscando actualizaciones...', 'info');
+                setTimeout(() => window.location.reload(), 1000);
+            }
+        });
+    } else {
+        window.location.reload();
+    }
+};
+
 window.mostrarModalNuevaVenta = mostrarModalNuevaVenta;
 window.mostrarModalCobrarVenta = mostrarModalCobrarVenta;
 window.mostrarModalNuevaCompra = mostrarModalNuevaCompra;
@@ -44,7 +95,6 @@ async function renderView() {
     else if (currentView === 'configuracion') root.innerHTML = renderConfiguracion();
     else root.innerHTML = renderDashboard();
     
-    // Inicializar eventos específicos de cada vista
     if (currentView === 'ventas') initVentasEvents();
     if (currentView === 'compras') initComprasEvents();
     if (currentView === 'presupuestos') initPresupuestosEvents();
@@ -92,10 +142,6 @@ function initPWA() {
         banner.classList.add('-translate-y-full');
         localStorage.setItem('hideInstallBanner', 'true');
     });
-    
-    if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('/sw.js').catch(err => console.log('SW error:', err));
-    }
 }
 
 window.showView = (view) => { currentView = view; renderView(); };
@@ -104,4 +150,6 @@ window.addEventListener('refreshView', () => renderView());
 cargarDB();
 initNavigation();
 initPWA();
+registerSW();
+checkForUpdates();
 renderView();
