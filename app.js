@@ -5,35 +5,49 @@ import { renderCompras, initComprasEvents, mostrarModalNuevaCompra, mostrarModal
 import { renderPresupuestos, initPresupuestosEvents } from './modules/presupuestos.js';
 import { renderReportes, initReportesEvents, cambiarReporteMes, exportarReportePDF } from './modules/reportes.js';
 import { renderContador } from './modules/contador.js';
-import { renderConfiguracion, initConfiguracionEvents, agregarBotonActualizacion } from './modules/configuracion.js';
+import { renderConfiguracion, initConfiguracionEvents, agregarBotonActualizacion, agregarBotonEjemplos } from './modules/configuracion.js';
+import { renderCalculadorGanancias, initCalculadorEvents } from './modules/calculadorGanancias.js';
 import { mostrarNotificacion } from './modules/utils.js';
+import { forzarActualizacionCompleta, verificarVersionRemota } from './modules/updater.js';
 
-const APP_VERSION = '4.5.4';
+const APP_VERSION = '5.0.0';
 const VERSION_KEY = 'app_version';
 
-function checkAndForceUpdate() {
+async function verificarAlCargar() {
     const savedVersion = localStorage.getItem(VERSION_KEY);
     if (savedVersion && savedVersion !== APP_VERSION) {
         localStorage.setItem(VERSION_KEY, APP_VERSION);
-        mostrarNotificacion(`🔄 Nueva versión ${APP_VERSION}. Recargando...`, 'info');
-        setTimeout(() => window.location.reload(true), 1500);
+        mostrarNotificacion(`🔄 Versión ${APP_VERSION} disponible. Actualizando...`, 'info');
+        setTimeout(() => window.location.reload(), 1500);
         return true;
     } else if (!savedVersion) {
         localStorage.setItem(VERSION_KEY, APP_VERSION);
     }
+    console.log(`📱 ERP Contable - Versión ${APP_VERSION}`);
     return false;
 }
 
 window.forzarActualizacion = async () => {
-    mostrarNotificacion("🔍 Buscando actualizaciones...", 'info');
-    try {
-        if ('caches' in window) {
-            const cacheNames = await caches.keys();
-            await Promise.all(cacheNames.map(name => caches.delete(name)));
-        }
-        setTimeout(() => window.location.reload(true), 1000);
-    } catch (error) {
-        mostrarNotificacion("Error al actualizar", 'error');
+    mostrarNotificacion("🔍 Verificando actualizaciones...", 'info');
+    
+    const { versionRemota, hayActualizacion } = await verificarVersionRemota();
+    
+    if (hayActualizacion) {
+        mostrarNotificacion(`🔄 Nueva versión ${versionRemota} encontrada. Actualizando...`, 'info');
+        await forzarActualizacionCompleta();
+    } else {
+        mostrarNotificacion("✅ Ya estás en la última versión", 'success');
+        setTimeout(() => {
+            if (confirm("¿Deseas recargar la app para asegurar que todo funciona correctamente?")) {
+                window.location.reload(true);
+            }
+        }, 1000);
+    }
+};
+
+window.limpiarTodo = () => {
+    if (confirm("⚠️ ¿ELIMINAR TODOS LOS DATOS y recargar la app?")) {
+        forzarActualizacionCompleta();
     }
 };
 
@@ -69,9 +83,13 @@ async function renderView() {
     else if (currentView === 'presupuestos') root.innerHTML = renderPresupuestos();
     else if (currentView === 'reportes') root.innerHTML = renderReportes();
     else if (currentView === 'contador') root.innerHTML = renderContador();
+    else if (currentView === 'calculador') root.innerHTML = renderCalculadorGanancias();
     else if (currentView === 'configuracion') {
         root.innerHTML = renderConfiguracion();
-        setTimeout(() => agregarBotonActualizacion(), 100);
+        setTimeout(() => {
+            agregarBotonActualizacion();
+            agregarBotonEjemplos();
+        }, 100);
     }
     else root.innerHTML = renderDashboard();
     
@@ -79,6 +97,7 @@ async function renderView() {
     if (currentView === 'compras') initComprasEvents();
     if (currentView === 'presupuestos') initPresupuestosEvents();
     if (currentView === 'reportes') initReportesEvents();
+    if (currentView === 'calculador') initCalculadorEvents();
     if (currentView === 'configuracion') initConfiguracionEvents();
 }
 
@@ -130,5 +149,5 @@ window.addEventListener('refreshView', () => renderView());
 cargarDB();
 initNavigation();
 initPWA();
-checkAndForceUpdate();
+verificarAlCargar();
 renderView();
