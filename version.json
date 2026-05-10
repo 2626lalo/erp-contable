@@ -1,5 +1,5 @@
 {
-    "version": "4.5.3",
-    "fecha": "2025-05-04",
-    "cambios": "Fix memoria insuficiente: compresión extrema (600px, 40% calidad) para CamScanner"
+    "version": "5.0.0",
+    "fecha": "2025-05-09",
+    "cambios": "Nuevo módulo: Calculador de Ganancia Neta Real para SAS Salta con IVA (21%), IIBB Salta (3.6%), TISSH (0.5%), Ganancias (25%) y Reserva Legal (5%). Diferenciación entre trabajo propio y tercerizado."
 }
