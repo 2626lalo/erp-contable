@@ -12,7 +12,7 @@ let itemsPresupuesto = [];
 let markupGlobal = 30;
 let usarMarkupGlobal = true;
 let incluirIVA = true;
-let esTercerizado = false;
+let esTercerizado = true;
 
 function getProximoNumeroPresupuesto() {
     const db = getDB();
@@ -318,7 +318,7 @@ function mostrarEditorPresupuesto() {
         itemsPresupuesto.forEach(item => {
             const markup = usarMarkupGlobal ? markupGlobal : (item.markup || 0);
             const precioVenta = item.costo * (1 + markup/100);
-            itemsHTML += `<tr><td style="padding: 8px;">${item.nro}</td><td style="padding: 8px;">${item.desc}</td><td style="text-align:center">${item.cant}</td><td style="text-align:right">$${formatNumber(precioVenta)}<\/td><td style="text-align:right">$${formatNumber(precioVenta * item.cant)}<\/td><\/tr>`;
+            itemsHTML += `<tr><td style="padding: 8px;">${item.nro}</td><td style="padding: 8px;">${item.desc}</td><td style="text-align:center">${item.cant}</td><td style="text-align:right">$${formatNumber(precioVenta)}</td><td style="text-align:right">$${formatNumber(precioVenta * item.cant)}</td></tr>`;
         });
         
         const ventana = window.open('', '_blank', 'width=900,height=700');
@@ -428,15 +428,15 @@ function mostrarEditorPresupuesto() {
             const subtotalVenta = precioVenta * item.cant;
             return `
                 <tr class="border-b">
-                    <td class="p-2 text-center">${item.nro}<\/td>
-                    <td class="p-2"><input value="${escapeHtml(item.desc)}" onchange="window.actualizarItem(${idx}, 'desc', this.value)" class="w-full p-1 border rounded text-sm"><\/td>
-                    <td class="p-2"><input type="number" value="${item.cant}" step="1" onchange="window.actualizarItem(${idx}, 'cant', this.value)" class="w-20 p-1 border rounded text-sm text-center"><\/td>
-                    <td class="p-2"><input type="number" value="${item.costo}" step="1000" onchange="window.actualizarItem(${idx}, 'costo', this.value)" class="w-32 p-1 border rounded text-sm text-right"><\/td>
-                    ${!usarMarkupGlobal ? `<td class="p-2"><input type="number" value="${item.markup}" step="5" onchange="window.actualizarMarkupItem(${idx}, this.value)" class="w-20 p-1 border rounded text-sm text-center">%<\/td>` : ''}
-                    <td class="p-2 text-right font-medium text-green-600">$${formatNumber(precioVenta)}<\/td>
-                    <td class="p-2 text-right font-medium">$${formatNumber(subtotalVenta)}<\/td>
-                    <td class="p-2 text-center"><button onclick="window.eliminarItem(${idx})" class="text-red-500 text-xl">🗑️<\/button><\/td>
-                比
+                    <td class="p-2 text-center">${item.nro}</td>
+                    <td class="p-2"><input value="${escapeHtml(item.desc)}" onchange="window.actualizarItem(${idx}, 'desc', this.value)" class="w-full p-1 border rounded text-sm"></td>
+                    <td class="p-2"><input type="number" value="${item.cant}" step="1" onchange="window.actualizarItem(${idx}, 'cant', this.value)" class="w-20 p-1 border rounded text-sm text-center"></td>
+                    <td class="p-2"><input type="number" value="${item.costo}" step="1000" onchange="window.actualizarItem(${idx}, 'costo', this.value)" class="w-32 p-1 border rounded text-sm text-right"></td>
+                    ${!usarMarkupGlobal ? `<td class="p-2"><input type="number" value="${item.markup}" step="5" onchange="window.actualizarMarkupItem(${idx}, this.value)" class="w-20 p-1 border rounded text-sm text-center">%</td>` : ''}
+                    <td class="p-2 text-right font-medium text-green-600">$${formatNumber(precioVenta)}</td>
+                    <td class="p-2 text-right font-medium">$${formatNumber(subtotalVenta)}</td>
+                    <td class="p-2 text-center"><button onclick="window.eliminarItem(${idx})" class="text-red-500 text-xl">🗑️</button></td>
+                </tr>
             `;
         }).join('');
     }
