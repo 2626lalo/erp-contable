@@ -10,7 +10,7 @@ import { renderCalculadorGanancias, initCalculadorEvents } from './modules/calcu
 import { mostrarNotificacion } from './modules/utils.js';
 import { forzarActualizacionCompleta, verificarVersionRemota } from './modules/updater.js';
 
-const APP_VERSION = '5.0.0';
+const APP_VERSION = '5.2.2';
 const VERSION_KEY = 'app_version';
 
 async function verificarAlCargar() {
@@ -29,26 +29,20 @@ async function verificarAlCargar() {
 
 window.forzarActualizacion = async () => {
     mostrarNotificacion("🔍 Verificando actualizaciones...", 'info');
-    
     const { versionRemota, hayActualizacion } = await verificarVersionRemota();
-    
     if (hayActualizacion) {
         mostrarNotificacion(`🔄 Nueva versión ${versionRemota} encontrada. Actualizando...`, 'info');
         await forzarActualizacionCompleta();
     } else {
         mostrarNotificacion("✅ Ya estás en la última versión", 'success');
         setTimeout(() => {
-            if (confirm("¿Deseas recargar la app para asegurar que todo funciona correctamente?")) {
-                window.location.reload(true);
-            }
+            if (confirm("¿Deseas recargar la app?")) window.location.reload(true);
         }, 1000);
     }
 };
 
 window.limpiarTodo = () => {
-    if (confirm("⚠️ ¿ELIMINAR TODOS LOS DATOS y recargar la app?")) {
-        forzarActualizacionCompleta();
-    }
+    if (confirm("⚠️ ¿ELIMINAR TODOS LOS DATOS y recargar la app?")) forzarActualizacionCompleta();
 };
 
 window.mostrarModalNuevaVenta = mostrarModalNuevaVenta;

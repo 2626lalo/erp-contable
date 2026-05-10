@@ -1,4 +1,4 @@
-const CACHE_NAME = 'erp-contable-v5_0_0';
+const CACHE_NAME = 'erp-contable-v5_2_2';
 const urlsToCache = ['/', '/index.html', '/manifest.json', '/styles.css', '/app.js', '/version.json'];
 
 self.addEventListener('install', event => {
