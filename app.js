@@ -1,5 +1,5 @@
-import { cargarDB } from './modules/db.js';
-import { renderDashboard } from './modules/dashboard.js';
+import { cargarDB, getDB } from './modules/db.js';
+import { renderDashboard, initDashboardEvents } from './modules/dashboard.js';
 import { renderVentas, initVentasEvents, mostrarModalNuevaVenta, mostrarModalCobrarVenta } from './modules/ventas.js';
 import { renderCompras, initComprasEvents, mostrarModalNuevaCompra, mostrarModalPagarCompra } from './modules/compras.js';
 import { renderPresupuestos, initPresupuestosEvents } from './modules/presupuestos.js';
@@ -7,10 +7,11 @@ import { renderReportes, initReportesEvents, cambiarReporteMes, exportarReporteP
 import { renderContador } from './modules/contador.js';
 import { renderConfiguracion, initConfiguracionEvents, agregarBotonActualizacion, agregarBotonEjemplos } from './modules/configuracion.js';
 import { renderCalculadorGanancias, initCalculadorEvents } from './modules/calculadorGanancias.js';
+import { renderGastosPersonales, initGastosPersonalesEvents } from './modules/gastosPersonales.js';
 import { mostrarNotificacion } from './modules/utils.js';
 import { forzarActualizacionCompleta, verificarVersionRemota } from './modules/updater.js';
 
-const APP_VERSION = '5.2.2';
+const APP_VERSION = '6.0.0';
 const VERSION_KEY = 'app_version';
 
 async function verificarAlCargar() {
@@ -71,28 +72,49 @@ async function renderView() {
     const root = document.getElementById('root');
     if (!root) return;
     
-    if (currentView === 'dashboard') root.innerHTML = renderDashboard();
-    else if (currentView === 'ventas') root.innerHTML = renderVentas();
-    else if (currentView === 'compras') root.innerHTML = renderCompras();
-    else if (currentView === 'presupuestos') root.innerHTML = renderPresupuestos();
-    else if (currentView === 'reportes') root.innerHTML = renderReportes();
-    else if (currentView === 'contador') root.innerHTML = renderContador();
-    else if (currentView === 'calculador') root.innerHTML = renderCalculadorGanancias();
+    if (currentView === 'dashboard') {
+        root.innerHTML = await renderDashboard();
+        if (initDashboardEvents) initDashboardEvents();
+    }
+    else if (currentView === 'ventas') {
+        root.innerHTML = renderVentas();
+        if (initVentasEvents) initVentasEvents();
+    }
+    else if (currentView === 'compras') {
+        root.innerHTML = renderCompras();
+        if (initComprasEvents) initComprasEvents();
+    }
+    else if (currentView === 'presupuestos') {
+        root.innerHTML = renderPresupuestos();
+        if (initPresupuestosEvents) initPresupuestosEvents();
+    }
+    else if (currentView === 'reportes') {
+        root.innerHTML = renderReportes();
+        if (initReportesEvents) initReportesEvents();
+    }
+    else if (currentView === 'contador') {
+        root.innerHTML = renderContador();
+    }
+    else if (currentView === 'calculador') {
+        root.innerHTML = renderCalculadorGanancias();
+        if (initCalculadorEvents) initCalculadorEvents();
+    }
+    else if (currentView === 'gastosPersonales') {
+        root.innerHTML = renderGastosPersonales();
+        setTimeout(() => initGastosPersonalesEvents(), 100);
+    }
     else if (currentView === 'configuracion') {
         root.innerHTML = renderConfiguracion();
         setTimeout(() => {
-            agregarBotonActualizacion();
-            agregarBotonEjemplos();
+            if (agregarBotonActualizacion) agregarBotonActualizacion();
+            if (agregarBotonEjemplos) agregarBotonEjemplos();
+            if (initConfiguracionEvents) initConfiguracionEvents();
         }, 100);
     }
-    else root.innerHTML = renderDashboard();
-    
-    if (currentView === 'ventas') initVentasEvents();
-    if (currentView === 'compras') initComprasEvents();
-    if (currentView === 'presupuestos') initPresupuestosEvents();
-    if (currentView === 'reportes') initReportesEvents();
-    if (currentView === 'calculador') initCalculadorEvents();
-    if (currentView === 'configuracion') initConfiguracionEvents();
+    else {
+        root.innerHTML = await renderDashboard();
+        if (initDashboardEvents) initDashboardEvents();
+    }
 }
 
 function initNavigation() {
@@ -101,6 +123,9 @@ function initNavigation() {
         btn.addEventListener('click', () => {
             currentView = btn.dataset.view;
             renderView();
+            // Actualizar clase activa
+            navButtons.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
         });
     });
 }
@@ -119,7 +144,9 @@ function initPWA() {
     window.addEventListener('beforeinstallprompt', (e) => {
         e.preventDefault();
         deferredPrompt = e;
-        banner?.classList.remove('-translate-y-full');
+        if (!localStorage.getItem('hideInstallBanner')) {
+            banner?.classList.remove('-translate-y-full');
+        }
     });
     
     installBtn?.addEventListener('click', async () => {
@@ -137,11 +164,28 @@ function initPWA() {
     });
 }
 
+function initDarkMode() {
+    const darkMode = localStorage.getItem('darkMode') === 'true';
+    if (darkMode) document.body.classList.add('dark');
+    
+    const btn = document.getElementById('darkModeBtn');
+    if (btn) {
+        btn.addEventListener('click', () => {
+            const isDark = document.body.classList.contains('dark');
+            if (isDark) document.body.classList.remove('dark');
+            else document.body.classList.add('dark');
+            localStorage.setItem('darkMode', !isDark);
+        });
+    }
+}
+
 window.showView = (view) => { currentView = view; renderView(); };
 window.addEventListener('refreshView', () => renderView());
 
+// Inicializar
 cargarDB();
 initNavigation();
 initPWA();
+initDarkMode();
 verificarAlCargar();
 renderView();

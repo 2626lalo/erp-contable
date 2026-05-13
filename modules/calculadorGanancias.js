@@ -17,7 +17,6 @@ export function renderCalculadorGanancias() {
             </div>
             
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <!-- Panel izquierdo -->
                 <div class="bg-white dark:bg-gray-800 rounded-2xl p-5 shadow-lg">
                     <h3 class="text-lg font-bold mb-4">📝 Datos de la Operación</h3>
                     
@@ -54,14 +53,12 @@ export function renderCalculadorGanancias() {
                     </div>
                 </div>
                 
-                <!-- Panel derecho - Resultados -->
                 <div class="bg-white dark:bg-gray-800 rounded-2xl p-5 shadow-lg">
                     <h3 class="text-lg font-bold mb-4">📊 Resultados</h3>
                     
                     <div class="space-y-3">
                         <div class="bg-blue-50 p-3 rounded">
                             <div class="flex justify-between"><span>Ingreso Bruto:</span><span id="ingresoBruto" class="font-bold">$0</span></div>
-                            <div class="flex justify-between text-sm"><span>Monto Neto:</span><span id="montoNetoDisplay">$0</span></div>
                         </div>
                         
                         <div class="border-t pt-2">
@@ -90,7 +87,7 @@ export function renderCalculadorGanancias() {
                         </div>
                     </div>
                     
-                    <div class="mt-4 p-2 bg-gray-100 text-xs rounded">
+                    <div class="mt-4 p-2 bg-gray-100 rounded text-xs">
                         <p class="font-bold">Nota:</p>
                         <p>IIBB Salta 3.6% | TISSH 0.5% | Ganancias 25% | Reserva Legal 5%</p>
                     </div>
@@ -98,6 +95,10 @@ export function renderCalculadorGanancias() {
             </div>
         </div>
     `;
+}
+
+function formatNumber(num) {
+    return num?.toLocaleString('es-AR') || '0';
 }
 
 function calcular() {
@@ -126,20 +127,20 @@ function calcular() {
     const reservaLegal = despuesGanancias * CONSTANTES.RESERVA_LEGAL;
     const gananciaNeta = Math.max(0, despuesGanancias - reservaLegal);
     
-    // Actualizar UI
-    document.getElementById('ingresoBruto').innerHTML = `$${montoNeto.toLocaleString('es-AR')}`;
-    document.getElementById('montoNetoDisplay').innerHTML = `$${montoNeto.toLocaleString('es-AR')}`;
-    document.getElementById('ivaDebito').innerHTML = `$${ivaDebito.toLocaleString('es-AR')}`;
-    document.getElementById('ivaCredito').innerHTML = `$${ivaCredito.toLocaleString('es-AR')}`;
-    document.getElementById('ivaPagar').innerHTML = `$${ivaPagar.toLocaleString('es-AR')}`;
-    document.getElementById('iibb').innerHTML = `$${iibb.toLocaleString('es-AR')}`;
-    document.getElementById('tissh').innerHTML = `$${tissh.toLocaleString('es-AR')}`;
-    document.getElementById('totalGastos').innerHTML = `$${totalGastos.toLocaleString('es-AR')}`;
-    document.getElementById('utilidadAntes').innerHTML = `$${utilidadAntes.toLocaleString('es-AR')}`;
-    document.getElementById('impuestoGanancias').innerHTML = `$${impuestoGanancias.toLocaleString('es-AR')}`;
-    document.getElementById('reservaLegal').innerHTML = `$${reservaLegal.toLocaleString('es-AR')}`;
-    document.getElementById('gananciaNeta').innerHTML = `$${gananciaNeta.toLocaleString('es-AR')}`;
+    document.getElementById('ingresoBruto').innerHTML = `$${formatNumber(montoNeto)}`;
+    document.getElementById('ivaDebito').innerHTML = `$${formatNumber(ivaDebito)}`;
+    document.getElementById('ivaCredito').innerHTML = `$${formatNumber(ivaCredito)}`;
+    document.getElementById('ivaPagar').innerHTML = `$${formatNumber(ivaPagar)}`;
+    document.getElementById('iibb').innerHTML = `$${formatNumber(iibb)}`;
+    document.getElementById('tissh').innerHTML = `$${formatNumber(tissh)}`;
+    document.getElementById('totalGastos').innerHTML = `$${formatNumber(totalGastos)}`;
+    document.getElementById('utilidadAntes').innerHTML = `$${formatNumber(utilidadAntes)}`;
+    document.getElementById('impuestoGanancias').innerHTML = `$${formatNumber(impuestoGanancias)}`;
+    document.getElementById('reservaLegal').innerHTML = `$${formatNumber(reservaLegal)}`;
+    document.getElementById('gananciaNeta').innerHTML = `$${formatNumber(gananciaNeta)}`;
 }
+
+window.calcularGanancias = calcular;
 
 window.cambiarEscenario = () => {
     const escenario = document.querySelector('input[name="escenario"]:checked')?.value;
@@ -147,10 +148,10 @@ window.cambiarEscenario = () => {
     const ivaCreditoRow = document.getElementById('ivaCreditoRow');
     
     if (escenario === 'tercerizado') {
-        divTercerizacion?.classList.remove('hidden');
+        if (divTercerizacion) divTercerizacion.classList.remove('hidden');
         if (ivaCreditoRow) ivaCreditoRow.style.display = 'flex';
     } else {
-        divTercerizacion?.classList.add('hidden');
+        if (divTercerizacion) divTercerizacion.classList.add('hidden');
         if (ivaCreditoRow) ivaCreditoRow.style.display = 'none';
         const costoInput = document.getElementById('costoTercerizacion');
         if (costoInput) costoInput.value = '0';
