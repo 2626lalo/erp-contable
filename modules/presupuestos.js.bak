@@ -1,0 +1,772 @@
+import { getDB, guardarDB } from './db.js';
+import { formatNumber, mostrarNotificacion, generarId } from './utils.js';
+
+let itemsPresupuesto = [];
+let markupGlobal = 30;
+let usarMarkupGlobal = true;
+let incluirIVA = true;
+
+export function renderPresupuestos() {
+    const db = getDB();
+    return `
+        <div class="space-y-5 fade-in pb-24">
+            <div class="flex gap-3">
+                <button onclick="window.mostrarModalNuevoPresupuesto()" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-xl flex-1">+ Nuevo</button>
+                <button onclick="window.mostrarModalCargaPresupuesto()" class="bg-green-600 hover:bg-green-700 text-white px-5 py-2 rounded-xl flex-1">📷 Cargar</button>
+            </div>
+            <div id="listaPresupuestos" class="space-y-3">
+                ${db.presupuestos.slice().reverse().map(p => `
+                    <div class="bg-white dark:bg-gray-800 rounded-2xl p-4 shadow-md cursor-pointer" onclick="window.verPresupuestoDetalle(${p.id})">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <h3 class="font-bold">${p.cliente}</h3>
+                                <p class="text-sm">Total: $${formatNumber(p.total)} | ${p.numero}</p>
+                                <p class="text-xs text-gray-500">${p.fechaCreacion?.split('T')[0]}</p>
+                            </div>
+                            <button onclick="event.stopPropagation();window.eliminarPresupuesto(${p.id})" class="bg-red-100 text-red-700 px-3 py-1 rounded-xl text-sm">🗑️</button>
+                        </div>
+                    </div>
+                `).join('') || '<p class="text-center text-gray-500">No hay presupuestos</p>'}
+            </div>
+        </div>`;
+}
+
+function generarNumeroItem() {
+    return itemsPresupuesto.length + 1;
+}
+
+function getVigencia() {
+    const fecha = new Date();
+    fecha.setDate(fecha.getDate() + 7);
+    return fecha.toLocaleDateString('es-AR');
+}
+
+window.mostrarModalNuevoPresupuesto = () => {
+    itemsPresupuesto = [
+        { nro: 1, desc: "Producto/Servicio", cant: 1, costo: 10000, markup: 30 }
+    ];
+    markupGlobal = 30;
+    usarMarkupGlobal = true;
+    incluirIVA = true;
+    mostrarEditorPresupuesto();
+};
+
+window.mostrarModalCargaPresupuesto = () => {
+    const db = getDB();
+    const clientesOptions = db.clientes.map(c => `<option value="${c.id}">${c.nombre}</option>`).join('');
+    
+    document.getElementById('root').innerHTML = `
+        <div class="fixed inset-0 bg-gray-900 bg-opacity-50 overflow-y-auto z-50 p-4">
+            <div class="max-w-2xl mx-auto bg-white dark:bg-gray-800 rounded-2xl shadow-2xl">
+                <div class="p-4 border-b flex justify-between">
+                    <h2 class="text-xl font-bold">📄 Cargar Presupuesto</h2>
+                    <button onclick="window.dispatchEvent(new Event('refreshView'))" class="text-gray-500 text-2xl">&times;</button>
+                </div>
+                <div class="p-4">
+                    <select id="clienteSelect" class="w-full p-2 border rounded-lg mb-4">
+                        <option value="">Seleccionar cliente...</option>
+                        ${clientesOptions}
+                    </select>
+                    <div id="itemsContainer" class="space-y-2 mb-4">
+                        <div class="flex gap-2">
+                            <input type="text" placeholder="Producto" class="itemDesc flex-1 p-2 border rounded-lg">
+                            <input type="number" placeholder="Cant." value="1" class="itemCant w-20 p-2 border rounded-lg">
+                            <input type="number" placeholder="Precio" class="itemPrecio w-28 p-2 border rounded-lg">
+                            <button class="removeItem text-red-500">🗑️</button>
+                        </div>
+                    </div>
+                    <button id="agregarItemCarga" class="bg-gray-200 px-3 py-1 rounded-lg text-sm mb-4">+ Agregar item</button>
+                    <button id="procesarCarga" class="w-full bg-green-600 text-white py-3 rounded-xl">➡️ Procesar</button>
+                </div>
+            </div>
+        </div>`;
+    
+    document.getElementById('agregarItemCarga').onclick = () => {
+        const container = document.getElementById('itemsContainer');
+        const div = document.createElement('div');
+        div.className = 'flex gap-2';
+        div.innerHTML = `
+            <input type="text" placeholder="Producto" class="itemDesc flex-1 p-2 border rounded-lg">
+            <input type="number" placeholder="Cant." value="1" class="itemCant w-20 p-2 border rounded-lg">
+            <input type="number" placeholder="Precio" class="itemPrecio w-28 p-2 border rounded-lg">
+            <button class="removeItem text-red-500">🗑️</button>
+        `;
+        div.querySelector('.removeItem').onclick = () => div.remove();
+        container.appendChild(div);
+    };
+    
+    document.querySelectorAll('.removeItem').forEach(btn => btn.onclick = function() { this.closest('.flex').remove(); });
+    
+    document.getElementById('procesarCarga').onclick = () => {
+        const items = [];
+        let nro = 1;
+        document.querySelectorAll('#itemsContainer .itemDesc').forEach((desc, i) => {
+            const nombre = desc.value;
+            const cant = parseFloat(document.querySelectorAll('.itemCant')[i]?.value) || 1;
+            const precio = parseFloat(document.querySelectorAll('.itemPrecio')[i]?.value) || 0;
+            if (nombre && precio > 0) {
+                items.push({ nro: nro++, desc: nombre, cant, costo: precio, markup: 30 });
+            }
+        });
+        if (items.length === 0) {
+            mostrarNotificacion("Agregá al menos un item", 'error');
+            return;
+        }
+        itemsPresupuesto = items;
+        markupGlobal = 30;
+        usarMarkupGlobal = true;
+        incluirIVA = true;
+        mostrarEditorPresupuesto();
+    };
+};
+
+function mostrarEditorPresupuesto() {
+    const db = getDB();
+    const empresa = db.empresas.find(e => e.id === db.empresaActiva) || db.empresas[0];
+    const clientesOptions = db.clientes.map(c => `<option value="${c.id}">${c.nombre}</option>`).join('');
+    
+    document.getElementById('root').innerHTML = `
+        <div class="fixed inset-0 bg-gray-900 bg-opacity-50 overflow-y-auto z-50 p-4">
+            <div class="max-w-6xl mx-auto bg-white dark:bg-gray-800 rounded-2xl shadow-2xl">
+                <div class="p-4 border-b dark:border-gray-700 flex justify-between items-center">
+                    <h2 class="text-xl font-bold">✏️ Editar Presupuesto</h2>
+                    <button onclick="window.dispatchEvent(new Event('refreshView'))" class="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
+                </div>
+                <div class="p-4">
+                    <div class="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg mb-4 text-sm">
+                        <div class="font-bold text-blue-700 dark:text-blue-300">${empresa?.nombre || 'Mi Empresa'}</div>
+                        <div class="text-xs text-gray-600 dark:text-gray-400">CUIT: ${empresa?.cuit || '30-12345678-9'}</div>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <label class="block font-medium mb-1">Cliente</label>
+                            <select id="clienteSelect" class="w-full p-2 border rounded-lg">
+                                <option value="">Seleccionar cliente...</option>
+                                ${clientesOptions}
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block font-medium mb-1">Patente / Unidad</label>
+                            <input type="text" id="patente" placeholder="Ej: ABC-123" class="w-full p-2 border rounded-lg">
+                        </div>
+                        <div>
+                            <label class="block font-medium mb-1">Centro de Costo</label>
+                            <input type="text" id="centroCosto" placeholder="Ej: CC-001" class="w-full p-2 border rounded-lg">
+                        </div>
+                        <div>
+                            <label class="block font-medium mb-1">Fecha de Vigencia</label>
+                            <input type="text" id="vigencia" value="${getVigencia()}" class="w-full p-2 border rounded-lg bg-gray-100" readonly>
+                        </div>
+                    </div>
+                    
+                    <!-- Selector de modo de markup -->
+                    <div class="flex gap-4 mb-4 p-3 bg-gray-100 dark:bg-gray-700 rounded-lg">
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="radio" name="modoMarkup" id="modoGlobal" value="global" checked onchange="window.toggleModoMarkup()">
+                            <span>🎚️ Margen Global (${markupGlobal}%)</span>
+                        </label>
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="radio" name="modoMarkup" id="modoIndividual" value="individual" onchange="window.toggleModoMarkup()">
+                            <span>✏️ Margen Individual por item</span>
+                        </label>
+                        <label class="flex items-center gap-2 cursor-pointer ml-auto">
+                            <input type="checkbox" id="incluirIVACheckbox" checked onchange="window.toggleIVA()">
+                            <span>💰 Incluir IVA 21%</span>
+                        </label>
+                    </div>
+                    
+                    <div id="controlGlobal" class="mb-4 p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
+                        <label class="block font-medium mb-1">🎚️ Margen Global: <span id="porcentajeLabel">${markupGlobal}</span>%</label>
+                        <input type="range" id="markupSlider" min="0" max="200" value="${markupGlobal}" class="w-full">
+                        <div class="flex justify-between text-xs text-gray-500 mt-1"><span>0%</span><span>50%</span><span>100%</span><span>150%</span><span>200%</span></div>
+                    </div>
+                    
+                    <h3 class="font-bold mb-2">📋 Detalle del Presupuesto</h3>
+                    <div class="overflow-x-auto border rounded-lg mb-4">
+                        <table class="min-w-full text-sm">
+                            <thead class="bg-gray-100 dark:bg-gray-700">
+                                <tr><th class="p-2">#</th><th class="p-2">Producto</th><th class="p-2 w-20">Cant.</th><th class="p-2 w-28">Costo U.</th><th class="p-2 w-28 markup-col">Markup %</th><th class="p-2 w-28">Precio</th><th class="p-2 w-28">Subtotal</th><th class="p-2 w-10"></th></tr>
+                            </thead>
+                            <tbody id="itemsBody"></tbody>
+                        </table>
+                    </div>
+                    
+                    <div class="flex gap-3 mb-4">
+                        <button id="agregarItem" class="bg-gray-200 dark:bg-gray-700 px-3 py-1.5 rounded-lg text-sm">+ Agregar item</button>
+                        <button id="vistaPreviaBtn" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-1.5 rounded-lg text-sm ml-auto">👁️ Vista Previa</button>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        <div class="border rounded-lg p-3 bg-gray-50 dark:bg-gray-900">
+                            <h3 class="font-bold text-sm mb-2">📋 Presupuesto Original</h3>
+                            <div id="vistaOriginal" class="text-sm"></div>
+                            <div class="border-t pt-2 mt-2 font-bold">Total Original: <span id="totalOriginal" class="text-blue-600">$0</span></div>
+                        </div>
+                        <div class="border border-green-200 rounded-lg p-3 bg-green-50 dark:bg-green-900/20">
+                            <h3 class="font-bold text-sm mb-2 text-green-700">💰 Presupuesto con Markup</h3>
+                            <div id="vistaFinal" class="text-sm"></div>
+                            <div class="border-t pt-2 mt-2 font-bold">Subtotal: <span id="subtotalFinal" class="text-green-600">$0</span></div>
+                            <div id="ivaRow" class="flex justify-between pt-1 text-sm">IVA 21%: <span id="ivaMonto" class="text-orange-600">$0</span></div>
+                            <div class="border-t pt-2 mt-1 font-bold text-lg">TOTAL PRESUPUESTO: <span id="totalFinal" class="text-green-700">$0</span></div>
+                            <div class="border-t mt-2 pt-2 text-sm">
+                                <div class="flex justify-between">💰 Diferencia de Precio: <span id="diferenciaPrecio" class="font-bold text-blue-600">$0</span></div>
+                                <div class="flex justify-between">📈 Ganancia Neta Estimada: <span id="gananciaNeta" class="font-bold text-purple-600">$0</span></div>
+                                <div class="flex justify-between text-xs text-gray-500">Diferencia IVA: <span id="diferenciaIVA" class="text-orange-600">$0</span></div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-4 p-3 bg-gray-100 dark:bg-gray-700 rounded-lg">
+                        <label class="block font-medium mb-1">📝 Comentarios / Observaciones</label>
+                        <textarea id="comentarios" rows="3" class="w-full p-2 border rounded-lg" placeholder="Sin otro particular, quedamos a su disposición..."></textarea>
+                    </div>
+                    
+                    <div class="mb-4 p-3 bg-gray-100 dark:bg-gray-700 rounded-lg text-xs">
+                        <p class="font-bold mb-1">📌 Condiciones Generales:</p>
+                        <ul class="list-disc pl-4 space-y-1">
+                            <li>Este presupuesto requiere previa autorización del cliente.</li>
+                            <li>Los valores están expresados en Pesos Argentinos (ARS).</li>
+                            <li>Los precios ${incluirIVA ? 'CONTENEN' : 'NO CONTIENEN'} IVA.</li>
+                            <li>Los costos pueden variar al momento de desarmar la unidad.</li>
+                            <li>Los tiempos de entrega dependen de la disponibilidad de repuestos.</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="flex gap-3">
+                        <button id="guardarPresupuesto" class="flex-1 bg-green-600 hover:bg-green-700 text-white py-3 rounded-xl">💾 Guardar</button>
+                        <button onclick="window.dispatchEvent(new Event('refreshView'))" class="flex-1 bg-gray-300 py-3 rounded-xl">Cancelar</button>
+                    </div>
+                </div>
+            </div>
+        </div>`;
+    
+    window.toggleModoMarkup = () => {
+        usarMarkupGlobal = document.getElementById('modoGlobal').checked;
+        const controlGlobal = document.getElementById('controlGlobal');
+        const markupCols = document.querySelectorAll('.markup-col');
+        
+        if (usarMarkupGlobal) {
+            controlGlobal.style.display = 'block';
+            markupCols.forEach(col => col.style.display = 'none');
+            itemsPresupuesto.forEach(item => item.markup = markupGlobal);
+        } else {
+            controlGlobal.style.display = 'none';
+            markupCols.forEach(col => col.style.display = 'table-cell');
+        }
+        renderizarTodo();
+    };
+    
+    window.toggleIVA = () => {
+        incluirIVA = document.getElementById('incluirIVACheckbox').checked;
+        const ivaRow = document.getElementById('ivaRow');
+        if (ivaRow) ivaRow.style.display = incluirIVA ? 'flex' : 'none';
+        renderizarTodo();
+    };
+    
+    window.actualizarMarkupGlobal = (valor) => {
+        markupGlobal = valor;
+        document.getElementById('porcentajeLabel').innerText = markupGlobal;
+        if (usarMarkupGlobal) {
+            itemsPresupuesto.forEach(item => item.markup = markupGlobal);
+            renderizarTodo();
+        }
+    };
+    
+    window.actualizarMarkupItem = (idx, valor) => {
+        if (itemsPresupuesto[idx]) {
+            itemsPresupuesto[idx].markup = parseFloat(valor) || 0;
+            renderizarTodo();
+        }
+    };
+    
+    window.actualizarItem = (idx, campo, valor) => {
+        if (itemsPresupuesto[idx]) {
+            if (campo === 'cant') itemsPresupuesto[idx].cant = parseFloat(valor) || 0;
+            else if (campo === 'costo') itemsPresupuesto[idx].costo = parseFloat(valor) || 0;
+            else if (campo === 'desc') itemsPresupuesto[idx].desc = procesarTextoItem(valor);
+        }
+        renderizarTodo();
+    };
+    
+    window.eliminarItem = (idx) => {
+        itemsPresupuesto.splice(idx, 1);
+        // Renumerar items
+        itemsPresupuesto.forEach((item, i) => item.nro = i + 1);
+        renderizarTodo();
+    };
+    
+    document.getElementById('agregarItem').onclick = () => {
+        itemsPresupuesto.push({ nro: itemsPresupuesto.length + 1, desc: "Nuevo servicio", cant: 1, costo: 10000, markup: markupGlobal });
+        renderizarTodo();
+    };
+    
+    const slider = document.getElementById('markupSlider');
+    if (slider) {
+        slider.oninput = (e) => window.actualizarMarkupGlobal(parseInt(e.target.value));
+    }
+    
+    document.getElementById('vistaPreviaBtn').onclick = () => {
+        const clienteId = parseInt(document.getElementById('clienteSelect').value);
+        const cliente = db.clientes.find(c => c.id === clienteId);
+        if (!cliente) {
+            mostrarNotificacion("Seleccioná un cliente para ver la vista previa", 'warning');
+            return;
+        }
+        mostrarVistaPrevia();
+    };
+    
+    function mostrarVistaPrevia() {
+        const clienteId = parseInt(document.getElementById('clienteSelect').value);
+        const cliente = db.clientes.find(c => c.id === clienteId);
+        const patente = document.getElementById('patente').value;
+        const centroCosto = document.getElementById('centroCosto').value;
+        const comentarios = document.getElementById('comentarios').value || "Sin otro particular, quedamos a su disposición.";
+        const vigencia = document.getElementById('vigencia').value;
+        
+        let totalOriginal = 0;
+        let totalSinIVA = 0;
+        let itemsHTML = '';
+        
+        itemsPresupuesto.forEach(item => {
+            const markupItem = usarMarkupGlobal ? markupGlobal : (item.markup || 0);
+            const precioVenta = item.costo * (1 + markupItem/100);
+            const subtotal = precioVenta * item.cant;
+            totalOriginal += item.costo * item.cant;
+            totalSinIVA += subtotal;
+            itemsHTML += `<tr style="border-bottom: 1px solid #ddd;"><td style="padding: 8px; text-align: center;">${item.nro}</td><td style="padding: 8px;">${escapeHtml(item.desc)}</td><td style="padding: 8px; text-align: center;">${item.cant}</td><td style="padding: 8px; text-align: right;">$${formatNumber(item.costo)}</td><td style="padding: 8px; text-align: center;">${markupItem}%</td><td style="padding: 8px; text-align: right;">$${formatNumber(precioVenta)}</td><td style="padding: 8px; text-align: right;">$${formatNumber(subtotal)}</td></tr>`;
+        });
+        
+        const iva = incluirIVA ? totalSinIVA * 0.21 : 0;
+        const totalConIVA = totalSinIVA + iva;
+        const ganancia = totalSinIVA - totalOriginal;
+        const diferenciaIVA = incluirIVA ? (totalConIVA - totalSinIVA) - (totalOriginal * 0.21) : 0;
+        
+        const condiciones = `Condiciones Generales:
+• Este presupuesto requiere previa autorización del cliente.
+• Los valores están expresados en Pesos Argentinos (ARS).
+• Los precios ${incluirIVA ? 'CONTENEN' : 'NO CONTIENEN'} IVA.
+• Los costos pueden variar al momento de desarmar la unidad.
+• Los tiempos de entrega dependen de la disponibilidad de repuestos.`;
+        
+        const previewWindow = window.open('', '_blank', 'width=1000,height=800,scrollbars=yes');
+        previewWindow.document.write(`
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Presupuesto - ${cliente.nombre}</title>
+                <meta charset="UTF-8">
+                <style>
+                    body { font-family: Arial, sans-serif; padding: 20px; max-width: 1000px; margin: 0 auto; }
+                    .header { text-align: center; border-bottom: 2px solid #1e3a8a; padding-bottom: 20px; margin-bottom: 20px; }
+                    .header h1 { color: #1e3a8a; margin: 0; }
+                    .cliente-info, .condiciones { background: #f3f4f6; padding: 15px; border-radius: 8px; margin-bottom: 20px; }
+                    .condiciones { font-size: 11px; }
+                    table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+                    th { background: #1e3a8a; color: white; padding: 10px; text-align: left; }
+                    td { padding: 8px; }
+                    .totales { text-align: right; margin-top: 20px; padding-top: 10px; border-top: 2px solid #ddd; }
+                    .iva { color: #f59e0b; }
+                    .total { font-size: 1.2em; font-weight: bold; color: #059669; }
+                    .ganancia { color: #8b5cf6; }
+                    .diferencia { color: #3b82f6; }
+                    .footer { margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; text-align: center; font-size: 11px; color: #666; }
+                    button { background: #1e3a8a; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; margin-top: 20px; margin-right: 10px; }
+                    @media print { .no-print { display: none; } }
+                </style>
+            </head>
+            <body>
+                <div class="header">
+                    <h1>${empresa?.nombre || 'Mi Empresa'}</h1>
+                    <p>CUIT: ${empresa?.cuit || '30-12345678-9'} | Tel: ${empresa?.telefono || '11-1234-5678'}</p>
+                    <p>${empresa?.direccion || 'Av. Corrientes 123, CABA'}</p>
+                </div>
+                <div class="cliente-info">
+                    <p><strong>Cliente:</strong> ${cliente.nombre}</p>
+                    <p><strong>Patente / Unidad:</strong> ${patente || 'No especificada'}</p>
+                    <p><strong>Centro de Costo:</strong> ${centroCosto || 'No especificado'}</p>
+                    <p><strong>Fecha de Emisión:</strong> ${new Date().toLocaleDateString()}</p>
+                    <p><strong>Vigencia:</strong> ${vigencia}</p>
+                </div>
+                <h3>📋 Detalle del Presupuesto</h3>
+                <table>
+                    <thead><tr><th>#</th><th>Producto/Servicio</th><th>Cant.</th><th>Costo U.</th><th>Markup</th><th>Precio</th><th>Subtotal</th></tr></thead>
+                    <tbody>${itemsHTML}</tbody>
+                </table>
+                <div class="totales">
+                    <p>💰 Costo Original: <strong>$${formatNumber(totalOriginal)}</strong></p>
+                    <p class="diferencia">📊 Diferencia de Precio: <strong>$${formatNumber(ganancia)}</strong></p>
+                    <p>Subtotal con Markup: <strong>$${formatNumber(totalSinIVA)}</strong></p>
+                    ${incluirIVA ? `<p class="iva">💰 IVA 21%: <strong>$${formatNumber(iva)}</strong></p>` : ''}
+                    <p class="total">TOTAL DEL PRESUPUESTO: <strong>$${formatNumber(totalConIVA)}</strong></p>
+                    <p class="ganancia">📈 Ganancia Neta Estimada: <strong>$${formatNumber(ganancia)}</strong></p>
+                    ${incluirIVA ? `<p class="iva">📊 Diferencia de IVA: <strong>$${formatNumber(diferenciaIVA)}</strong></p>` : ''}
+                </div>
+                <div class="condiciones">
+                    <strong>📌 Condiciones Generales:</strong><br>
+                    ${condiciones.replace(/\n/g, '<br>')}
+                </div>
+                <div class="footer">
+                    <p>${comentarios}</p>
+                    <p><br>${empresa?.nombre || 'Mi Empresa'} - Saluda atentamente.</p>
+                </div>
+                <div class="no-print" style="text-align: center;">
+                    <button onclick="window.print()">🖨️ Imprimir / Guardar PDF</button>
+                    <button onclick="window.close()" style="background: #6b7280;">✖️ Cerrar</button>
+                </div>
+            </body>
+            </html>
+        `);
+        previewWindow.document.close();
+    }
+    
+    document.getElementById('guardarPresupuesto').onclick = () => {
+        const clienteId = parseInt(document.getElementById('clienteSelect').value);
+        const cliente = db.clientes.find(c => c.id === clienteId);
+        if (!cliente) {
+            mostrarNotificacion("Seleccioná un cliente", 'error');
+            return;
+        }
+        
+        let totalOriginal = 0;
+        let totalSinIVA = 0;
+        itemsPresupuesto.forEach(item => {
+            const markup = usarMarkupGlobal ? markupGlobal : (item.markup || 0);
+            totalOriginal += item.costo * item.cant;
+            totalSinIVA += item.costo * (1 + markup/100) * item.cant;
+        });
+        const iva = incluirIVA ? totalSinIVA * 0.21 : 0;
+        const totalConIVA = totalSinIVA + iva;
+        const numero = `P-${(db.presupuestos.length + 1001)}`;
+        
+        db.presupuestos.push({
+            id: generarId(),
+            clienteId: cliente.id,
+            cliente: cliente.nombre,
+            patente: document.getElementById('patente').value,
+            centroCosto: document.getElementById('centroCosto').value,
+            vigencia: document.getElementById('vigencia').value,
+            comentarios: document.getElementById('comentarios').value,
+            incluirIVA: incluirIVA,
+            items: itemsPresupuesto.map(i => ({ ...i })),
+            usarMarkupGlobal: usarMarkupGlobal,
+            markupGlobal: markupGlobal,
+            totalOriginal: totalOriginal,
+            totalSinIVA: totalSinIVA,
+            iva: iva,
+            total: totalConIVA,
+            numero: numero,
+            fechaCreacion: new Date().toISOString(),
+            estado: 'PENDIENTE'
+        });
+        
+        guardarDB();
+        mostrarNotificacion(`✅ Presupuesto ${numero} guardado por $${formatNumber(totalConIVA)}`, 'success');
+        window.dispatchEvent(new Event('refreshView'));
+    };
+    
+    function renderizarTodo() {
+        renderizarTablaItems();
+        renderizarVistaComparativa();
+    }
+    
+    function renderizarTablaItems() {
+        const tbody = document.getElementById('itemsBody');
+        if (!tbody) return;
+        
+        tbody.innerHTML = itemsPresupuesto.map((item, idx) => {
+            const markupItem = usarMarkupGlobal ? markupGlobal : (item.markup || 0);
+            const precioVenta = item.costo * (1 + markupItem/100);
+            const subtotal = precioVenta * item.cant;
+            
+            return `
+                <tr class="border-b dark:border-gray-700">
+                    <td class="p-2 text-center">${item.nro}</td>
+                    <td class="p-2"><input value="${escapeHtml(item.desc)}" onchange="window.actualizarItem(${idx}, 'desc', this.value)" class="w-full p-1 border rounded text-sm"></td>
+                    <td class="p-2"><input type="number" value="${item.cant}" step="1" onchange="window.actualizarItem(${idx}, 'cant', this.value); window.renderizarTodo()" class="w-20 p-1 border rounded text-sm text-center"></td>
+                    <td class="p-2"><input type="number" value="${item.costo}" step="100" onchange="window.actualizarItem(${idx}, 'costo', this.value); window.renderizarTodo()" class="w-28 p-1 border rounded text-sm text-right"></td>
+                    ${!usarMarkupGlobal ? `<td class="p-2"><input type="number" value="${item.markup || 0}" step="5" onchange="window.actualizarMarkupItem(${idx}, this.value); window.renderizarTodo()" class="w-20 p-1 border rounded text-sm text-center">%<div><input type="range" min="0" max="200" value="${item.markup || 0}" step="5" onchange="window.actualizarMarkupItem(${idx}, this.value); window.renderizarTodo()" class="w-24 mt-1"></div></td>` : ''}
+                    <td class="p-2 text-right font-medium text-green-600">$${formatNumber(precioVenta)}</td>
+                    <td class="p-2 text-right font-medium">$${formatNumber(subtotal)}</td>
+                    <td class="p-2 text-center"><button onclick="window.eliminarItem(${idx})" class="text-red-500 hover:text-red-700 text-xl">🗑️</button></td>
+                </tr>
+            `;
+        }).join('');
+    }
+    
+    function renderizarVistaComparativa() {
+        const vistaOriginal = document.getElementById('vistaOriginal');
+        const vistaFinal = document.getElementById('vistaFinal');
+        const totalOriginalSpan = document.getElementById('totalOriginal');
+        const subtotalFinalSpan = document.getElementById('subtotalFinal');
+        const ivaMontoSpan = document.getElementById('ivaMonto');
+        const totalFinalSpan = document.getElementById('totalFinal');
+        const diferenciaPrecioSpan = document.getElementById('diferenciaPrecio');
+        const gananciaNetoSpan = document.getElementById('gananciaNeta');
+        const diferenciaIVASpan = document.getElementById('diferenciaIVA');
+        const ivaRow = document.getElementById('ivaRow');
+        
+        if (!vistaOriginal) return;
+        
+        let totalOriginal = 0;
+        let totalSinIVA = 0;
+        let originalHTML = '';
+        let finalHTML = '';
+        
+        itemsPresupuesto.forEach(item => {
+            const subtotalOrig = item.costo * item.cant;
+            const markupItem = usarMarkupGlobal ? markupGlobal : (item.markup || 0);
+            const precioVenta = item.costo * (1 + markupItem/100);
+            const subtotalFinal = precioVenta * item.cant;
+            
+            totalOriginal += subtotalOrig;
+            totalSinIVA += subtotalFinal;
+            
+            originalHTML += `<div class="flex justify-between py-1"><span>${escapeHtml(item.desc)} x${item.cant}</span><span>$${formatNumber(subtotalOrig)}</span></div>`;
+            finalHTML += `<div class="flex justify-between py-1"><span>${escapeHtml(item.desc)} x${item.cant}</span><span>$${formatNumber(precioVenta)} = $${formatNumber(subtotalFinal)}</span><span class="text-xs text-gray-400 ml-1">(${markupItem}%)</span></div>`;
+        });
+        
+        const iva = incluirIVA ? totalSinIVA * 0.21 : 0;
+        const totalConIVA = totalSinIVA + iva;
+        const ganancia = totalSinIVA - totalOriginal;
+        const diferenciaIVA = incluirIVA ? (totalConIVA - totalSinIVA) : 0;
+        
+        vistaOriginal.innerHTML = originalHTML || '<p class="text-gray-400 text-center">Sin items</p>';
+        vistaFinal.innerHTML = finalHTML || '<p class="text-gray-400 text-center">Sin items</p>';
+        totalOriginalSpan.innerText = `$${formatNumber(totalOriginal)}`;
+        subtotalFinalSpan.innerText = `$${formatNumber(totalSinIVA)}`;
+        if (ivaMontoSpan) ivaMontoSpan.innerText = `$${formatNumber(iva)}`;
+        totalFinalSpan.innerText = `$${formatNumber(totalConIVA)}`;
+        if (diferenciaPrecioSpan) diferenciaPrecioSpan.innerText = `$${formatNumber(ganancia)}`;
+        if (gananciaNetoSpan) gananciaNetoSpan.innerText = `$${formatNumber(ganancia)}`;
+        if (diferenciaIVASpan) diferenciaIVASpan.innerText = `$${formatNumber(diferenciaIVA)}`;
+        if (ivaRow) ivaRow.style.display = incluirIVA ? 'flex' : 'none';
+    }
+    
+    window.toggleModoMarkup();
+    document.getElementById('incluirIVACheckbox').checked = incluirIVA;
+    window.toggleIVA();
+    renderizarTodo();
+}
+
+window.verPresupuestoDetalle = (id) => {
+    const db = getDB();
+    const p = db.presupuestos.find(x => x.id === id);
+    const empresa = db.empresas.find(e => e.id === db.empresaActiva) || db.empresas[0];
+    if (!p) return;
+    
+    document.getElementById('root').innerHTML = `
+        <div class="bg-white dark:bg-gray-800 p-5 rounded-2xl shadow-lg pb-24 max-w-4xl mx-auto">
+            <button onclick="window.dispatchEvent(new Event('refreshView'))" class="text-gray-600 mb-4">← Volver</button>
+            
+            <div class="bg-blue-50 p-3 rounded-lg mb-4">
+                <div class="font-bold">${empresa?.nombre || 'Mi Empresa'}</div>
+                <div class="text-xs">CUIT: ${empresa?.cuit || '30-12345678-9'}</div>
+            </div>
+            
+            <h2 class="text-xl font-bold mb-2">📄 Presupuesto Nº ${p.numero}</h2>
+            <p class="text-sm text-gray-500 mb-2">Cliente: ${p.cliente}</p>
+            <p class="text-sm text-gray-500 mb-2">Patente: ${p.patente || 'N/E'} | Centro Costo: ${p.centroCosto || 'N/E'}</p>
+            <p class="text-sm text-gray-500 mb-4">Vigencia: ${p.vigencia}</p>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="border rounded-lg p-3">
+                    <h3 class="font-bold text-sm mb-2">📋 Presupuesto Original</h3>
+                    ${p.items.map(i => `<div class="flex justify-between text-sm py-1"><span>${i.nro}. ${escapeHtml(i.desc)} x${i.cant}</span><span>$${formatNumber(i.costo * i.cant)}</span></div>`).join('')}
+                    <div class="border-t pt-2 mt-2 font-bold">Total Original: $${formatNumber(p.totalOriginal)}</div>
+                </div>
+                <div class="border border-green-200 bg-green-50 rounded-lg p-3">
+                    <h3 class="font-bold text-sm mb-2 text-green-700">💰 Presupuesto Final</h3>
+                    ${p.items.map(i => {
+                        const markup = p.usarMarkupGlobal ? p.markupGlobal : (i.markup || 0);
+                        const precio = i.costo * (1 + markup/100);
+                        return `<div class="flex justify-between text-sm py-1"><span>${i.nro}. ${escapeHtml(i.desc)} x${i.cant}</span><span>$${formatNumber(precio)} = $${formatNumber(precio * i.cant)}</span><span class="text-xs text-gray-400">(${markup}%)</span></div>`;
+                    }).join('')}
+                    <div class="border-t pt-2 mt-2">Subtotal: <span class="font-bold">$${formatNumber(p.totalSinIVA)}</span></div>
+                    ${p.incluirIVA ? `<div class="text-orange-600">IVA 21%: $${formatNumber(p.iva)}</div>` : ''}
+                    <div class="border-t pt-2 mt-2 font-bold text-lg text-green-700">TOTAL: $${formatNumber(p.total)}</div>
+                    <div class="border-t mt-2 pt-2 text-sm">
+                        <div>💰 Diferencia: $${formatNumber(p.totalSinIVA - p.totalOriginal)}</div>
+                        <div class="text-purple-600">📈 Ganancia: $${formatNumber(p.totalSinIVA - p.totalOriginal)}</div>
+                    </div>
+                </div>
+            </div>
+            
+            ${p.comentarios ? `<div class="mt-4 p-3 bg-gray-100 rounded-lg"><p class="text-sm">${escapeHtml(p.comentarios)}</p></div>` : ''}
+            
+            <div class="flex gap-3 mt-5">
+                <button onclick="window.exportarPresupuestoPDF(${p.id})" class="flex-1 bg-purple-600 text-white py-2 rounded-xl">📄 Exportar PDF</button>
+            </div>
+        </div>`;
+};
+
+window.exportarPresupuestoPDF = (id) => {
+    const db = getDB();
+    const p = db.presupuestos.find(x => x.id === id);
+    const empresa = db.empresas.find(e => e.id === db.empresaActiva) || db.empresas[0];
+    if (!p) return;
+    
+    const itemsHTML = p.items.map(i => {
+        const markup = p.usarMarkupGlobal ? p.markupGlobal : (i.markup || 0);
+        const precio = i.costo * (1 + markup/100);
+        return `<tr style="border-bottom: 1px solid #ddd;"><td style="padding: 8px; text-align: center;">${i.nro}</td><td style="padding: 8px;">${escapeHtml(i.desc)}</td><td style="padding: 8px; text-align: center;">${i.cant}</td><td style="padding: 8px; text-align: right;">$${formatNumber(i.costo)}</td><td style="padding: 8px; text-align: center;">${markup}%</td><td style="padding: 8px; text-align: right;">$${formatNumber(precio)}</td><td style="padding: 8px; text-align: right;">$${formatNumber(precio * i.cant)}</td></tr>`;
+    }).join('');
+    
+    const condiciones = `Condiciones Generales:
+• Este presupuesto requiere previa autorización del cliente.
+• Los valores están expresados en Pesos Argentinos (ARS).
+• Los precios ${p.incluirIVA ? 'CONTENEN' : 'NO CONTIENEN'} IVA.
+• Los costos pueden variar al momento de desarmar la unidad.
+• Los tiempos de entrega dependen de la disponibilidad de repuestos.`;
+    
+    const content = `
+        <div style="font-family: Arial, sans-serif; padding: 20px;">
+            <div style="text-align: center; border-bottom: 2px solid #1e3a8a; padding-bottom: 20px;">
+                <h1 style="color: #1e3a8a;">${empresa?.nombre || 'Mi Empresa'}</h1>
+                <p>CUIT: ${empresa?.cuit || '30-12345678-9'} | Tel: ${empresa?.telefono || '11-1234-5678'}</p>
+                <p>${empresa?.direccion || 'Av. Corrientes 123, CABA'}</p>
+            </div>
+            <h2 style="text-align: center;">PRESUPUESTO Nº ${p.numero}</h2>
+            <p><strong>Cliente:</strong> ${p.cliente}</p>
+            <p><strong>Patente/Unidad:</strong> ${p.patente || 'No especificada'}</p>
+            <p><strong>Centro de Costo:</strong> ${p.centroCosto || 'No especificado'}</p>
+            <p><strong>Fecha de Emisión:</strong> ${p.fechaCreacion?.split('T')[0]}</p>
+            <p><strong>Vigencia:</strong> ${p.vigencia}</p>
+            <h3>📋 Detalle del Presupuesto</h3>
+            <table style="width: 100%; border-collapse: collapse; margin-top: 20px;">
+                <thead><tr style="background: #1e3a8a; color: white;"><th>#</th><th>Producto</th><th>Cant.</th><th>Costo U.</th><th>Markup</th><th>Precio</th><th>Subtotal</th></tr></thead>
+                <tbody>${itemsHTML}</tbody>
+                <tfoot>
+                    <tr><td colspan="6" style="padding: 8px; text-align: right;"><strong>Subtotal:</strong></td><td style="padding: 8px;">$${formatNumber(p.totalSinIVA)}</td></tr>
+                    ${p.incluirIVA ? `<tr><td colspan="6" style="padding: 8px; text-align: right;"><strong>IVA 21%:</strong></td><td style="padding: 8px;" class="iva">$${formatNumber(p.iva)}</td></tr>` : ''}
+                    <tr style="background: #f3f4f6;"><td colspan="6" style="padding: 8px; text-align: right;"><strong>TOTAL:</strong></td><td style="padding: 8px;"><strong>$${formatNumber(p.total)}</strong></td></tr>
+                    <tr><td colspan="6" style="padding: 8px; text-align: right;">💰 Diferencia de Precio:</td><td style="padding: 8px;">$${formatNumber(p.totalSinIVA - p.totalOriginal)}</td></tr>
+                    <tr><td colspan="6" style="padding: 8px; text-align: right;" class="ganancia">📈 Ganancia Neta Estimada:</td><td style="padding: 8px;" class="ganancia">$${formatNumber(p.totalSinIVA - p.totalOriginal)}</td></tr>
+                </tfoot>
+            </table>
+            <div style="margin-top: 20px; padding: 10px; background: #f3f4f6; font-size: 11px;">
+                <strong>📌 Condiciones Generales:</strong><br>
+                ${condiciones.replace(/\n/g, '<br>')}
+            </div>
+            <div style="margin-top: 30px; text-align: center; font-size: 11px; color: #666;">
+                <p>${p.comentarios || "Sin otro particular, quedamos a su disposición."}</p>
+                <p><br>${empresa?.nombre || 'Mi Empresa'} - Saluda atentamente.</p>
+            </div>
+        </div>
+    `;
+    
+    html2pdf().set({ margin: 1, filename: `presupuesto_${p.numero}.pdf` }).from(content).save();
+    mostrarNotificacion(`📄 PDF generado: ${p.numero}`, 'success');
+};
+
+window.eliminarPresupuesto = (id) => {
+    if (confirm("¿Eliminar este presupuesto?")) {
+        const db = getDB();
+        db.presupuestos = db.presupuestos.filter(p => p.id !== id);
+        guardarDB();
+        mostrarNotificacion("🗑️ Presupuesto eliminado", 'info');
+        window.dispatchEvent(new Event('refreshView'));
+    }
+};
+
+function escapeHtml(str) {
+    if (!str) return '';
+    return str.replace(/[&<>]/g, m => m === '&' ? '&amp;' : m === '<' ? '&lt;' : '&gt;');
+}
+
+export function initPresupuestosEvents() {}
+
+// ========== FUNCIONES DE CORRECCIÓN DE TEXTO ==========
+function convertirAMayusculas(texto) {
+    if (!texto) return '';
+    return texto.toUpperCase().trim();
+}
+
+function corregirGramaticaEspanol(texto) {
+    if (!texto) return '';
+    
+    let corregido = texto.trim();
+    
+    // Primera letra de cada palabra en mayúscula (para nombres propios)
+    // Pero mantener mayúsculas ya existentes
+    
+    // Corregir tildes comunes (mapeo básico)
+    const correcciones = {
+        'á': 'a', 'é': 'e', 'í': 'i', 'ó': 'o', 'ú': 'u',
+        'Á': 'A', 'É': 'E', 'Í': 'I', 'Ó': 'O', 'Ú': 'U',
+        'ñ': 'ñ', 'Ñ': 'Ñ',
+        // Palabras comunes mal escritas
+        'servicio': 'SERVICIO',
+        'producto': 'PRODUCTO',
+        'mantenimiento': 'MANTENIMIENTO',
+        'instalacion': 'INSTALACIÓN',
+        'instalación': 'INSTALACIÓN',
+        'reparacion': 'REPARACIÓN',
+        'reparación': 'REPARACIÓN',
+        'consultoria': 'CONSULTORÍA',
+        'consultoría': 'CONSULTORÍA',
+        'desarrollo': 'DESARROLLO',
+        'software': 'SOFTWARE',
+        'hardware': 'HARDWARE',
+        'redes': 'REDES',
+        'soporte': 'SOPORTE',
+        'tecnico': 'TÉCNICO',
+        'tecnico': 'TÉCNICO'
+    };
+    
+    // Aplicar correcciones específicas
+    for (const [mal, bien] of Object.entries(correcciones)) {
+        const regex = new RegExp(mal, 'gi');
+        corregido = corregido.replace(regex, bien);
+    }
+    
+    return corregido.toUpperCase();
+}
+
+// Función combinada para procesar texto de items
+function procesarTextoItem(texto) {
+    if (!texto) return '';
+    // Convertir a mayúsculas y aplicar correcciones
+    let procesado = texto.toUpperCase().trim();
+    
+    // Correcciones específicas en mayúsculas
+    const correccionesMayus = {
+        'SERVICIO': 'SERVICIO',
+        'PRODUCTO': 'PRODUCTO',
+        'MANTENIMIENTO': 'MANTENIMIENTO',
+        'INSTALACION': 'INSTALACIÓN',
+        'INSTALACIÓN': 'INSTALACIÓN',
+        'REPARACION': 'REPARACIÓN',
+        'REPARACIÓN': 'REPARACIÓN',
+        'CONSULTORIA': 'CONSULTORÍA',
+        'CONSULTORÍA': 'CONSULTORÍA',
+        'DESARROLLO': 'DESARROLLO',
+        'SOFTWARE': 'SOFTWARE',
+        'HARDWARE': 'HARDWARE',
+        'REDES': 'REDES',
+        'SOPORTE': 'SOPORTE',
+        'TECNICO': 'TÉCNICO',
+        'TÉCNICO': 'TÉCNICO'
+    };
+    
+    for (const [mal, bien] of Object.entries(correccionesMayus)) {
+        const regex = new RegExp(mal, 'g');
+        procesado = procesado.replace(regex, bien);
+    }
+    
+    return procesado;
+}
+
+// Sobrescribir la función actualizarItem con corrección automática
+// (Ejecutar esto en la consola del navegador para parchear la función existente)
+if (typeof window.actualizarItem !== 'undefined') {
+    window.actualizarItem = (idx, campo, valor) => {
+        if (itemsPresupuesto && itemsPresupuesto[idx]) {
+            if (campo === 'cant') itemsPresupuesto[idx].cant = parseFloat(valor) || 0;
+            else if (campo === 'costo') itemsPresupuesto[idx].costo = parseFloat(valor) || 0;
+            else if (campo === 'desc') itemsPresupuesto[idx].desc = procesarTextoItem(valor);
+        }
+        if (typeof renderizarTodo === 'function') renderizarTodo();
+    };
+    console.log("✅ Función actualizarItem actualizada con corrección de texto");
+}
