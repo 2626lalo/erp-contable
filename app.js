@@ -8,6 +8,7 @@ import { renderContador } from './modules/contador.js';
 import { renderConfiguracion, initConfiguracionEvents, agregarBotonActualizacion, agregarBotonEjemplos } from './modules/configuracion.js';
 import { renderCalculadorGanancias, initCalculadorEvents } from './modules/calculadorGanancias.js';
 import { renderGastosPersonales, initGastosPersonalesEvents } from './modules/gastosPersonales.js';
+import { renderGeneradorInformes, initGeneradorInformesEvents } from './modules/generadorInformes.js';
 import { mostrarNotificacion } from './modules/utils.js';
 import { forzarActualizacionCompleta, verificarVersionRemota } from './modules/updater.js';
 
@@ -103,6 +104,10 @@ async function renderView() {
         root.innerHTML = renderGastosPersonales();
         setTimeout(() => initGastosPersonalesEvents(), 100);
     }
+    else if (currentView === 'generadorInformes') {
+        root.innerHTML = renderGeneradorInformes();
+        setTimeout(() => initGeneradorInformesEvents(), 100);
+    }
     else if (currentView === 'configuracion') {
         root.innerHTML = renderConfiguracion();
         setTimeout(() => {
@@ -123,7 +128,6 @@ function initNavigation() {
         btn.addEventListener('click', () => {
             currentView = btn.dataset.view;
             renderView();
-            // Actualizar clase activa
             navButtons.forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
         });
@@ -182,7 +186,6 @@ function initDarkMode() {
 window.showView = (view) => { currentView = view; renderView(); };
 window.addEventListener('refreshView', () => renderView());
 
-// Inicializar
 cargarDB();
 initNavigation();
 initPWA();

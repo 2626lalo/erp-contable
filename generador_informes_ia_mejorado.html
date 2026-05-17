@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🤖 Generador de Informes - Jefatura de Flota</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 25px;
+        }
+
+        .header h1 {
+            font-size: 2rem;
+            margin-bottom: 8px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            margin-bottom: 25px;
+            overflow: hidden;
+        }
+
+        .card-header {
+            background: #f8f9fa;
+            padding: 15px 25px;
+            border-bottom: 2px solid #667eea;
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+
+        .card-body {
+            padding: 25px;
+        }
+
+        textarea, input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+
+        textarea {
+            min-height: 300px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+        }
+
+        label {
+            font-weight: bold;
+            display: block;
+            margin-bottom: 8px;
+            margin-top: 15px;
+        }
+
+        .mode-switch {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .mode-btn {
+            background: #e9ecef;
+            color: #333;
+            padding: 10px 25px;
+            border-radius: 30px;
+            cursor: pointer;
+            border: 2px solid transparent;
+            font-weight: bold;
+        }
+
+        .mode-btn.active {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 30px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 20px;
+            margin-right: 10px;
+        }
+
+        .btn-pdf {
+            background: #28a745;
+        }
+
+        .btn-pdf:hover {
+            background: #218838;
+        }
+
+        .result-panel {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            margin-top: 25px;
+            overflow: hidden;
+        }
+
+        .result-header {
+            background: #1e3a5f;
+            color: white;
+            padding: 15px 25px;
+            font-weight: bold;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .result-content {
+            padding: 20px;
+            min-height: 500px;
+            background: #fafafa;
+            overflow: auto;
+        }
+
+        iframe {
+            width: 100%;
+            min-height: 600px;
+            border: none;
+            background: white;
+        }
+
+        .info-box {
+            background: #d1ecf1;
+            border-left: 4px solid #0c5460;
+            padding: 12px 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 13px;
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            background: #28a745;
+            color: white;
+            padding: 12px 20px;
+            border-radius: 8px;
+            z-index: 1000;
+        }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1>🤖 Generador de Informes IA</h1>
+        <p>📄 Pegá texto o código HTML → Vista previa → Descargá PDF profesional</p>
+    </div>
+
+    <div class="card">
+        <div class="card-header">⚙️ Configuración</div>
+        <div class="card-body">
+            <div class="mode-switch">
+                <div id="modeIaBtn" class="mode-btn">🤖 Modo IA (Gemini)</div>
+                <div id="modeOfflineBtn" class="mode-btn active">📄 Modo Offline (HTML directo)</div>
+            </div>
+
+            <div id="iaConfigSection" style="display: none;">
+                <label>🔑 API Key de Gemini</label>
+                <input type="password" id="apiKey" placeholder="Ingresá tu API Key de Google AI Studio">
+                <button id="saveConfigBtn" style="background:#6c757d;">💾 Guardar</button>
+            </div>
+
+            <div class="info-box">
+                💡 <strong>Modo Offline / HTML directo:</strong><br>
+                • Si pegás <strong>texto normal</strong> → Se generará un informe automático con tabla.<br>
+                • Si pegás <strong>código HTML completo</strong> (como el de la IA) → Se renderizará tal cual, con gráficos y tablas.
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">📝 Paso 1: Ingresá tu contenido</div>
+        <div class="card-body">
+            <label>📌 Título (opcional)</label>
+            <input type="text" id="titulo" placeholder="Ej: Anexo Correctivo - Gestión de Flota">
+
+            <label>📝 Subtítulo (opcional)</label>
+            <input type="text" id="subtitulo" placeholder="Ej: Mayo 2026">
+
+            <label>📄 Texto o código a procesar</label>
+            <textarea id="contenido" placeholder='Pegá acá:\n\n- Texto normal con números para análisis automático\n- O código HTML completo (el que empieza con &lt;!DOCTYPE html&gt;...)'></textarea>
+
+            <button id="generarBtn">📄 Generar Informe</button>
+            <button id="clearBtn" style="background:#6c757d;">🗑️ Limpiar</button>
+        </div>
+    </div>
+
+    <div class="result-panel" id="resultPanel" style="display: none;">
+        <div class="result-header">
+            <span>📄 Vista Previa del Informe</span>
+            <button id="downloadPdfBtn" class="btn-pdf" style="margin-top:0;">📥 Descargar PDF</button>
+        </div>
+        <div class="result-content" id="resultContent">
+            <div style="text-align:center; padding:50px;">⏳ Procesando...</div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Elementos
+    const modeIaBtn = document.getElementById('modeIaBtn');
+    const modeOfflineBtn = document.getElementById('modeOfflineBtn');
+    const iaConfigSection = document.getElementById('iaConfigSection');
+    const apiKeyInput = document.getElementById('apiKey');
+    const saveConfigBtn = document.getElementById('saveConfigBtn');
+    const generarBtn = document.getElementById('generarBtn');
+    const clearBtn = document.getElementById('clearBtn');
+    const downloadPdfBtn = document.getElementById('downloadPdfBtn');
+    const resultPanel = document.getElementById('resultPanel');
+    const resultContent = document.getElementById('resultContent');
+    const tituloInput = document.getElementById('titulo');
+    const subtituloInput = document.getElementById('subtitulo');
+    const contenidoTextarea = document.getElementById('contenido');
+
+    let modoActual = 'offline';
+
+    // Cambiar modo
+    modeIaBtn.onclick = () => {
+        modoActual = 'ia';
+        modeIaBtn.classList.add('active');
+        modeOfflineBtn.classList.remove('active');
+        iaConfigSection.style.display = 'block';
+    };
+
+    modeOfflineBtn.onclick = () => {
+        modoActual = 'offline';
+        modeOfflineBtn.classList.add('active');
+        modeIaBtn.classList.remove('active');
+        iaConfigSection.style.display = 'none';
+    };
+
+    // Cargar API Key guardada
+    if (localStorage.getItem('gemini_api_key')) {
+        apiKeyInput.value = localStorage.getItem('gemini_api_key');
+    }
+
+    saveConfigBtn.onclick = () => {
+        const key = apiKeyInput.value.trim();
+        if (key) {
+            localStorage.setItem('gemini_api_key', key);
+            alert('✅ API Key guardada');
+        }
+    };
+
+    function showMessage(msg, isError = false) {
+        const toast = document.createElement('div');
+        toast.className = 'toast';
+        toast.style.backgroundColor = isError ? '#dc3545' : '#28a745';
+        toast.innerText = msg;
+        document.body.appendChild(toast);
+        setTimeout(() => toast.remove(), 3000);
+    }
+
+    // Función para detectar si es HTML
+    function esHTML(texto) {
+        const trimmed = texto.trim();
+        return trimmed.startsWith('<!DOCTYPE html>') || 
+               trimmed.startsWith('<html') ||
+               (trimmed.includes('<body') && trimmed.includes('</body>'));
+    }
+
+    // Función para extraer números de texto plano
+    function extraerNumeros(texto) {
+        const numeros = {};
+        const lines = texto.split('\n');
+        for (let line of lines) {
+            const match = line.match(/([A-Za-zÁÉÍÓÚñÑ\s]+):?\s*\$?(\d+(?:\.\d+)?)/i);
+            if (match) {
+                numeros[match[1].trim()] = match[2];
+            }
+        }
+        return numeros;
+    }
+
+    // Generar informe HTML desde texto plano
+    function generarHTMLDesdeTexto(texto, titulo, subtitulo) {
+        const numeros = extraerNumeros(texto);
+        let tablaHTML = '';
+        if (Object.keys(numeros).length > 0) {
+            tablaHTML = '<h3>📊 Datos numéricos detectados</h3><table style="width:100%; border-collapse:collapse;"><tr style="background:#1e3a5f; color:white;"><th style="padding:8px;">Concepto</th><th style="padding:8px;">Valor</th></tr>';
+            for (const [k, v] of Object.entries(numeros)) {
+                tablaHTML += `<tr><td style="border:1px solid #ddd; padding:8px;">${k}</td><td style="border:1px solid #ddd; padding:8px;">${v}</td></tr>`;
+            }
+            tablaHTML += '</table>';
+        }
+
+        return `
+            <div style="font-family: Arial, sans-serif; max-width: 1000px; margin: 0 auto; padding: 20px;">
+                ${titulo ? `<h1 style="color: #1e3a5f;">${titulo}</h1>` : ''}
+                ${subtitulo ? `<h3 style="color: #6c757d;">${subtitulo}</h3>` : ''}
+                <div style="background: #f8f9fa; padding: 20px; border-radius: 12px; margin: 20px 0;">
+                    <h3>📋 Resumen del contenido</h3>
+                    <p>${texto.replace(/\n/g, '<br>')}</p>
+                </div>
+                ${tablaHTML}
+                <p style="margin-top: 30px; font-size: 12px; color: #999;">📌 Informe generado en modo offline - ${new Date().toLocaleDateString()}</p>
+            </div>
+        `;
+    }
+
+    // Función principal para generar informe
+    async function generarInforme() {
+        const titulo = tituloInput.value;
+        const subtitulo = subtituloInput.value;
+        let contenido = contenidoTextarea.value;
+
+        if (!contenido.trim()) {
+            alert('Por favor, ingresá contenido (texto o código HTML)');
+            return;
+        }
+
+        resultPanel.style.display = 'block';
+        resultContent.innerHTML = '<div style="text-align:center; padding:50px;">⏳ Procesando...<br>Generando vista previa...</div>';
+
+        // DETECCIÓN AUTOMÁTICA: Si es HTML, renderizarlo directamente
+        if (esHTML(contenido)) {
+            // Es HTML: lo mostramos tal cual en un iframe
+            const iframe = document.createElement('iframe');
+            iframe.style.width = '100%';
+            iframe.style.minHeight = '600px';
+            iframe.style.border = 'none';
+            resultContent.innerHTML = '';
+            resultContent.appendChild(iframe);
+            iframe.srcdoc = contenido;
+            showMessage('✅ HTML renderizado correctamente. Podés descargar el PDF.');
+            return;
+        }
+
+        // Si no es HTML, procesar según el modo
+        if (modoActual === 'offline') {
+            // Modo offline: generar informe desde texto plano
+            const htmlGenerado = generarHTMLDesdeTexto(contenido, titulo, subtitulo);
+            resultContent.innerHTML = htmlGenerado;
+            showMessage('✅ Informe generado desde texto plano.');
+        } else {
+            // Modo IA: llamar a Gemini
+            const apiKey = localStorage.getItem('gemini_api_key');
+            if (!apiKey) {
+                resultContent.innerHTML = '<div style="color:red; padding:20px;">❌ No hay API Key configurada. Guardá tu clave en la configuración o usá modo offline.</div>';
+                return;
+            }
+
+            try {
+                const prompt = `Generá un informe profesional HTML (solo el contenido interno, sin <html> ni <body>) con los siguientes datos. Incluí tablas, colores corporativos azul oscuro (#1e3a5f) y gris. Datos: ${contenido.substring(0, 3000)}. Título: ${titulo || 'Informe'}. Subtítulo: ${subtitulo || ''}. Fecha actual: ${new Date().toLocaleDateString()}.`;
+                
+                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: prompt }] }]
+                    })
+                });
+                
+                if (!response.ok) throw new Error('Error en API');
+                
+                const data = await response.json();
+                let htmlGenerado = data.candidates?.[0]?.content?.parts?.[0]?.text || '<p>No se pudo generar el informe.</p>';
+                htmlGenerado = htmlGenerado.replace(/```html/g, '').replace(/```/g, '');
+                resultContent.innerHTML = htmlGenerado;
+                showMessage('✅ Informe generado con IA.');
+            } catch (error) {
+                resultContent.innerHTML = '<div style="color:red; padding:20px;">❌ Error al generar con IA. Verificá tu API Key o usá modo offline.</div>';
+            }
+        }
+    }
+
+    // Descargar PDF
+    async function downloadPDF() {
+        const contenido = resultContent.innerHTML;
+        if (!contenido || contenido.includes('Procesando')) {
+            alert('Primero generá un informe');
+            return;
+        }
+
+        // Verificar si hay un iframe (caso HTML renderizado)
+        const iframe = resultContent.querySelector('iframe');
+        let contenidoAPDF = '';
+        
+        if (iframe && iframe.srcdoc) {
+            contenidoAPDF = iframe.srcdoc;
+        } else {
+            contenidoAPDF = `<div style="padding: 2cm; background: white; font-family: Arial;">${contenido}</div>`;
+        }
+
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = contenidoAPDF;
+        tempDiv.style.position = 'absolute';
+        tempDiv.style.left = '-9999px';
+        document.body.appendChild(tempDiv);
+
+        try {
+            const opt = {
+                margin: [0.5, 0.5, 0.5, 0.5],
+                filename: 'informe_flota.pdf',
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { scale: 2 },
+                jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
+            };
+            await html2pdf().set(opt).from(tempDiv).save();
+            showMessage('✅ PDF descargado');
+        } catch(e) {
+            showMessage('❌ Error al generar PDF. Usá Ctrl+P desde el navegador.', true);
+        } finally {
+            document.body.removeChild(tempDiv);
+        }
+    }
+
+    function limpiar() {
+        tituloInput.value = '';
+        subtituloInput.value = '';
+        contenidoTextarea.value = '';
+        resultPanel.style.display = 'none';
+        showMessage('Editor limpiado');
+    }
+
+    // Eventos
+    generarBtn.onclick = generarInforme;
+    clearBtn.onclick = limpiar;
+    downloadPdfBtn.onclick = downloadPDF;
+</script>
+</body>
+</html>

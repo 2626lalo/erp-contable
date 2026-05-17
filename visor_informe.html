@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visor de Informe - Jefatura de Flota</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #e9ecef;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1300px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: #1e3a5f;
+            color: white;
+            padding: 20px;
+            border-radius: 12px 12px 0 0;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 1.8rem;
+        }
+
+        .card {
+            background: white;
+            border-radius: 0 0 12px 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+            overflow: hidden;
+        }
+
+        .card-header {
+            background: #f8f9fa;
+            padding: 15px 20px;
+            border-bottom: 2px solid #1e3a5f;
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+
+        .card-body {
+            padding: 20px;
+        }
+
+        textarea {
+            width: 100%;
+            min-height: 350px;
+            padding: 15px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            resize: vertical;
+        }
+
+        button {
+            background: #1e3a5f;
+            color: white;
+            border: none;
+            padding: 10px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+            margin-top: 15px;
+            margin-right: 10px;
+        }
+
+        button:hover {
+            background: #2c5282;
+        }
+
+        .btn-pdf {
+            background: #28a745;
+        }
+
+        .btn-pdf:hover {
+            background: #218838;
+        }
+
+        .btn-clear {
+            background: #6c757d;
+        }
+
+        .preview-area {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            margin-top: 20px;
+            overflow: hidden;
+        }
+
+        .preview-header {
+            background: #1e3a5f;
+            color: white;
+            padding: 12px 20px;
+            font-weight: bold;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .preview-content {
+            padding: 20px;
+            background: #f5f5f5;
+            min-height: 500px;
+        }
+
+        iframe {
+            width: 100%;
+            min-height: 550px;
+            border: none;
+            background: white;
+        }
+
+        .info {
+            background: #d1ecf1;
+            border-left: 4px solid #0c5460;
+            padding: 12px 15px;
+            margin-bottom: 20px;
+            border-radius: 6px;
+            font-size: 13px;
+        }
+
+        .badge {
+            background: #28a745;
+            color: white;
+            padding: 3px 10px;
+            border-radius: 20px;
+            font-size: 11px;
+            margin-left: 10px;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1>📄 Visor de Informe HTML a PDF</h1>
+        <p>Pegá el código HTML → Vista previa → Descargá PDF</p>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            ✏️ Pegá acá el código HTML de tu informe
+            <span class="badge">Soporta gráficos Chart.js</span>
+        </div>
+        <div class="card-body">
+            <div class="info">
+                💡 <strong>Instrucciones:</strong><br>
+                1. Copiá TODO el código HTML del informe (el que empieza con <code>&lt;!DOCTYPE html&gt;</code>).<br>
+                2. Pegalo en el recuadro de abajo.<br>
+                3. Hacé clic en <strong>"👁️ Vista Previa"</strong> para ver el informe renderizado.<br>
+                4. Hacé clic en <strong>"📥 Descargar PDF"</strong> para guardar el informe.
+            </div>
+
+            <textarea id="htmlCode" placeholder='Pegá acá el código HTML completo...&#10;&#10;Ejemplo:&#10;&lt;!DOCTYPE html&gt;&#10;&lt;html lang="es"&gt;&#10;&lt;head&gt;&#10;    &lt;title&gt;Anexo Correctivo&lt;/title&gt;&#10;    &lt;script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"&gt;&lt;/script&gt;&#10;...'></textarea>
+
+            <div>
+                <button id="previewBtn">👁️ Vista Previa</button>
+                <button id="downloadBtn" class="btn-pdf">📥 Descargar PDF</button>
+                <button id="clearBtn" class="btn-clear">🗑️ Limpiar</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="preview-area" id="previewArea" style="display: none;">
+        <div class="preview-header">
+            <span>🖥️ Vista Previa del Informe</span>
+            <button id="pdfBtn" class="btn-pdf" style="margin:0; padding:6px 16px;">📥 PDF</button>
+        </div>
+        <div class="preview-content" id="previewContent">
+            <div style="text-align:center; padding:50px;">Cargando vista previa...</div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const editor = document.getElementById('htmlCode');
+    const previewBtn = document.getElementById('previewBtn');
+    const downloadBtn = document.getElementById('downloadBtn');
+    const pdfBtn = document.getElementById('pdfBtn');
+    const clearBtn = document.getElementById('clearBtn');
+    const previewArea = document.getElementById('previewArea');
+    const previewContent = document.getElementById('previewContent');
+
+    let currentHTML = '';
+
+    function showMessage(msg) {
+        const div = document.createElement('div');
+        div.style.position = 'fixed';
+        div.style.bottom = '20px';
+        div.style.right = '20px';
+        div.style.background = '#28a745';
+        div.style.color = 'white';
+        div.style.padding = '10px 20px';
+        div.style.borderRadius = '8px';
+        div.style.zIndex = '9999';
+        div.innerText = msg;
+        document.body.appendChild(div);
+        setTimeout(() => div.remove(), 3000);
+    }
+
+    function previewHTML() {
+        const content = editor.value;
+        if (!content.trim()) {
+            alert('⚠️ No hay código HTML. Pegá el código del informe.');
+            return;
+        }
+
+        if (!content.trim().startsWith('<!DOCTYPE') && !content.trim().startsWith('<html')) {
+            alert('⚠️ El contenido no parece HTML válido. Debe empezar con <!DOCTYPE html>');
+            return;
+        }
+
+        currentHTML = content;
+        previewArea.style.display = 'block';
+        
+        const iframe = document.createElement('iframe');
+        iframe.style.width = '100%';
+        iframe.style.minHeight = '550px';
+        iframe.style.border = 'none';
+        
+        previewContent.innerHTML = '';
+        previewContent.appendChild(iframe);
+        iframe.srcdoc = content;
+        
+        showMessage('✅ Vista previa actualizada');
+    }
+
+    async function downloadPDF() {
+        if (!currentHTML) {
+            alert('⚠️ Primero hacé clic en "Vista Previa"');
+            return;
+        }
+
+        showMessage('⏳ Generando PDF...');
+
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = currentHTML;
+        tempDiv.style.position = 'absolute';
+        tempDiv.style.left = '-9999px';
+        tempDiv.style.top = '-9999px';
+        tempDiv.style.width = '1100px';
+        document.body.appendChild(tempDiv);
+
+        try {
+            const opt = {
+                margin: [0.5, 0.5, 0.5, 0.5],
+                filename: 'informe_flota.pdf',
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { scale: 2 },
+                jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
+            };
+            await html2pdf().set(opt).from(tempDiv).save();
+            showMessage('✅ PDF descargado');
+        } catch (err) {
+            alert('❌ Error al generar PDF. Usá Ctrl+P desde la vista previa.');
+        } finally {
+            document.body.removeChild(tempDiv);
+        }
+    }
+
+    function clearAll() {
+        editor.value = '';
+        previewArea.style.display = 'none';
+        currentHTML = '';
+        showMessage('✅ Limpiado');
+    }
+
+    previewBtn.onclick = previewHTML;
+    downloadBtn.onclick = downloadPDF;
+    if (pdfBtn) pdfBtn.onclick = downloadPDF;
+    clearBtn.onclick = clearAll;
+
+    // Ctrl+Enter para vista previa
+    editor.addEventListener('keydown', (e) => {
+        if (e.ctrlKey && e.key === 'Enter') {
+            e.preventDefault();
+            previewHTML();
+        }
+    });
+</script>
+</body>
+</html>

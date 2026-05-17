@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visor y Generador de Informes - Jefatura de Flota</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        /* Header */
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 25px;
+        }
+
+        .header h1 {
+            font-size: 2rem;
+            margin-bottom: 8px;
+        }
+
+        .header p {
+            opacity: 0.9;
+        }
+
+        /* Panel principal */
+        .main-panel {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        .editor-panel {
+            flex: 1;
+            min-width: 400px;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }
+
+        .preview-panel {
+            flex: 1;
+            min-width: 500px;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .panel-title {
+            background: #1e3a5f;
+            color: white;
+            padding: 15px 20px;
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+
+        textarea {
+            width: 100%;
+            height: 500px;
+            padding: 15px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            border: none;
+            resize: vertical;
+            outline: none;
+            background: #fafafa;
+        }
+
+        .preview-area {
+            flex: 1;
+            height: 500px;
+            overflow: auto;
+            background: white;
+            padding: 10px;
+        }
+
+        iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+            background: white;
+        }
+
+        .toolbar {
+            background: #f0f4f8;
+            padding: 12px 20px;
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            border-bottom: 1px solid #ddd;
+        }
+
+        button {
+            background: #1e3a5f;
+            color: white;
+            border: none;
+            padding: 10px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+
+        button:hover {
+            background: #2c5282;
+            transform: scale(1.02);
+        }
+
+        .btn-pdf {
+            background: #28a745;
+        }
+
+        .btn-pdf:hover {
+            background: #218838;
+        }
+
+        .btn-clear {
+            background: #6c757d;
+        }
+
+        .status-bar {
+            background: #e9ecef;
+            padding: 8px 15px;
+            font-size: 12px;
+            border-top: 1px solid #ddd;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .info-box {
+            background: #d1ecf1;
+            border-left: 4px solid #0c5460;
+            padding: 12px 15px;
+            margin: 15px;
+            border-radius: 8px;
+            font-size: 13px;
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            background: #28a745;
+            color: white;
+            padding: 12px 20px;
+            border-radius: 8px;
+            z-index: 1000;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1>📄 Visor y Generador de Informes IA</h1>
+        <p>Pegá tu código HTML → Vista previa en tiempo real → Descargá PDF profesional</p>
+    </div>
+
+    <div class="main-panel">
+        <!-- Panel Editor -->
+        <div class="editor-panel">
+            <div class="panel-title">✏️ 1. Pegá acá tu código HTML</div>
+            <textarea id="htmlCode" placeholder='Pegá acá el código HTML completo del informe (el que empieza con &lt;!DOCTYPE html&gt;...)'></textarea>
+            <div class="toolbar">
+                <button id="previewBtn">👁️ Actualizar vista previa</button>
+                <button id="downloadPdfBtn" class="btn-pdf">📥 Descargar PDF</button>
+                <button id="clearBtn" class="btn-clear">🗑️ Limpiar</button>
+            </div>
+            <div class="info-box">
+                💡 <strong>Instrucciones:</strong><br>
+                1. Copiá el código HTML completo del informe (el que generamos con gráficos y tablas).<br>
+                2. Pegalo en el recuadro de arriba.<br>
+                3. Hacé clic en "Actualizar vista previa" para verlo.<br>
+                4. Hacé clic en "Descargar PDF" para guardar el informe profesional.
+            </div>
+        </div>
+
+        <!-- Panel Vista Previa -->
+        <div class="preview-panel">
+            <div class="panel-title">🖥️ 2. Vista previa del informe</div>
+            <div class="preview-area">
+                <iframe id="previewIframe" title="Vista previa del informe"></iframe>
+            </div>
+            <div class="status-bar">
+                <span id="statusText">✅ Esperando código HTML...</span>
+                <span id="pageInfo"></span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const editor = document.getElementById('htmlCode');
+    const iframe = document.getElementById('previewIframe');
+    const statusText = document.getElementById('statusText');
+    const previewBtn = document.getElementById('previewBtn');
+    const downloadBtn = document.getElementById('downloadPdfBtn');
+    const clearBtn = document.getElementById('clearBtn');
+
+    // Función para mostrar mensaje flotante
+    function showMessage(msg, isError = false) {
+        const toast = document.createElement('div');
+        toast.className = 'toast';
+        toast.style.backgroundColor = isError ? '#dc3545' : '#28a745';
+        toast.innerText = msg;
+        document.body.appendChild(toast);
+        setTimeout(() => toast.remove(), 3000);
+    }
+
+    // Actualizar vista previa
+    function updatePreview() {
+        const content = editor.value;
+        if (!content.trim()) {
+            iframe.srcdoc = '<html><body style="font-family:Arial;padding:40px;text-align:center;"><h3>👈 No hay código HTML</h3><p>Pegá el código del informe en el panel izquierdo y hacé clic en "Actualizar vista previa".</p></body></html>';
+            statusText.innerHTML = '⚠️ Editor vacío. Pegá el código HTML.';
+            return;
+        }
+
+        // Detectar si parece HTML válido
+        if (!content.trim().startsWith('<!DOCTYPE') && !content.trim().startsWith('<html') && !content.trim().startsWith('<')) {
+            statusText.innerHTML = '⚠️ El contenido no parece ser HTML. Asegurate de pegar el código completo que empieza con &lt;!DOCTYPE html&gt;';
+            iframe.srcdoc = '<html><body style="font-family:Arial;padding:40px;"><h3>⚠️ Formato no reconocido</h3><p>El contenido pegado no parece ser HTML válido. Asegurate de copiar el código completo del informe.</p><pre style="background:#f0f0f0;padding:10px;">' + content.substring(0, 200) + '...</pre></body></html>';
+            return;
+        }
+
+        try {
+            iframe.srcdoc = content;
+            statusText.innerHTML = '✅ Vista previa actualizada correctamente.';
+            showMessage('Vista previa actualizada');
+        } catch(e) {
+            statusText.innerHTML = '❌ Error al renderizar el HTML. Verificá que el código sea válido.';
+            showMessage('Error en el HTML', true);
+        }
+    }
+
+    // Descargar PDF
+    async function downloadPDF() {
+        const content = editor.value;
+        if (!content.trim()) {
+            alert('No hay contenido para generar PDF. Primero pegá el código HTML.');
+            return;
+        }
+
+        if (!content.trim().startsWith('<!DOCTYPE') && !content.trim().startsWith('<html')) {
+            alert('El contenido no parece ser HTML válido. Asegurate de pegar el código completo del informe.');
+            return;
+        }
+
+        statusText.innerHTML = '⏳ Generando PDF, por favor esperá...';
+        showMessage('Procesando PDF...');
+
+        // Crear un elemento temporal para el PDF
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = content;
+        tempDiv.style.position = 'absolute';
+        tempDiv.style.left = '-9999px';
+        tempDiv.style.top = '-9999px';
+        tempDiv.style.width = '1100px';
+        tempDiv.style.backgroundColor = 'white';
+        document.body.appendChild(tempDiv);
+
+        try {
+            const opt = {
+                margin: [0.5, 0.5, 0.5, 0.5],
+                filename: 'Anexo_Correctivo_Gestion_Flota.pdf',
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { scale: 2, useCORS: false, logging: false },
+                jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
+            };
+            await html2pdf().set(opt).from(tempDiv).save();
+            statusText.innerHTML = '✅ PDF generado y descargado correctamente.';
+            showMessage('✅ PDF listo');
+        } catch (err) {
+            console.error('Error:', err);
+            statusText.innerHTML = '❌ Error al generar PDF. Probá con "Vista previa" e imprimir desde el navegador (Ctrl+P).';
+            showMessage('❌ Error al generar PDF', true);
+        } finally {
+            document.body.removeChild(tempDiv);
+        }
+    }
+
+    // Limpiar editor
+    function clearEditor() {
+        editor.value = '';
+        iframe.srcdoc = '<html><body style="font-family:Arial;padding:40px;text-align:center;"><h3>📄 Editor limpiado</h3><p>Pegá el código HTML del informe y hacé clic en "Actualizar vista previa".</p></body></html>';
+        statusText.innerHTML = '✅ Editor limpiado. Esperando código HTML...';
+        showMessage('Editor limpiado');
+    }
+
+    // Eventos
+    previewBtn.onclick = updatePreview;
+    downloadBtn.onclick = downloadPDF;
+    clearBtn.onclick = clearEditor;
+
+    // Atajo: Ctrl+Enter para actualizar preview
+    editor.addEventListener('keydown', (e) => {
+        if (e.ctrlKey && e.key === 'Enter') {
+            e.preventDefault();
+            updatePreview();
+        }
+    });
+
+    // Mensaje inicial
+    statusText.innerHTML = '✅ Listo. Pegá el código HTML y hacé clic en "Actualizar vista previa".';
+</script>
+</body>
+</html>

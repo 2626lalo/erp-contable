@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🤖 Generador de Informes - Jefatura de Flota</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        /* Header */
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        /* Tarjetas */
+        .card {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            margin-bottom: 25px;
+            overflow: hidden;
+        }
+
+        .card-header {
+            background: #f8f9fa;
+            padding: 15px 25px;
+            border-bottom: 2px solid #667eea;
+            font-weight: bold;
+            font-size: 1.2rem;
+            color: #333;
+        }
+
+        .card-body {
+            padding: 25px;
+        }
+
+        /* Formulario */
+        textarea, input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+            font-family: monospace;
+        }
+
+        textarea {
+            min-height: 200px;
+            font-family: 'Courier New', monospace;
+        }
+
+        label {
+            font-weight: bold;
+            display: block;
+            margin-bottom: 8px;
+            margin-top: 15px;
+            color: #333;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+
+        .badge-ia { background: #667eea; color: white; }
+        .badge-offline { background: #28a745; color: white; }
+
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 30px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 20px;
+            transition: transform 0.2s;
+        }
+
+        button:hover {
+            transform: scale(1.02);
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            margin-left: 10px;
+        }
+
+        /* Panel de resultado */
+        .result-panel {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            margin-top: 30px;
+            overflow: hidden;
+        }
+
+        .result-header {
+            background: #1e3a5f;
+            color: white;
+            padding: 15px 25px;
+            font-weight: bold;
+        }
+
+        .result-content {
+            padding: 25px;
+            min-height: 400px;
+            background: white;
+        }
+
+        .mode-switch {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .mode-btn {
+            background: #e9ecef;
+            color: #333;
+            padding: 8px 20px;
+            border-radius: 30px;
+            cursor: pointer;
+            border: 2px solid transparent;
+        }
+
+        .mode-btn.active {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+
+        .api-section {
+            background: #f0f4f8;
+            padding: 15px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .alert {
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+        }
+
+        .alert-success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .alert-error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+
+        /* Vista previa HTML */
+        .html-preview {
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            overflow: auto;
+            background: white;
+        }
+
+        iframe {
+            width: 100%;
+            min-height: 600px;
+            border: none;
+        }
+
+        .info-text {
+            background: #d1ecf1;
+            border-left: 4px solid #0c5460;
+            padding: 12px 15px;
+            border-radius: 6px;
+            margin-bottom: 15px;
+            font-size: 13px;
+        }
+    </style>
+    <!-- Librerías -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1>🤖 Generador de Informes IA</h1>
+        <p>📄 Pegá texto o código HTML → Generá informes profesionales al instante</p>
+        <p style="font-size: 12px; margin-top: 8px;">✨ Nuevo: Podés pegar código HTML directamente (el de la IA) y se renderizará como informe completo</p>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            ⚙️ Configuración
+        </div>
+        <div class="card-body">
+            <div class="mode-switch">
+                <div id="modeIaBtn" class="mode-btn active">🤖 Modo IA (Gemini)</div>
+                <div id="modeOfflineBtn" class="mode-btn">📄 Modo Offline (HTML directo)</div>
+            </div>
+
+            <div id="iaConfigSection" class="api-section">
+                <label>🔑 API Key de Gemini</label>
+                <input type="password" id="apiKey" placeholder="Ingresá tu API Key de Google AI Studio">
+                <p style="font-size: 12px; margin-top: 8px;">Obtené tu clave gratis en <a href="https://aistudio.google.com/" target="_blank">Google AI Studio</a></p>
+                <button id="testApiBtn" class="btn-secondary">🔍 Probar conexión</button>
+                <button id="saveConfigBtn" class="btn-secondary">💾 Guardar configuración</button>
+            </div>
+
+            <div id="offlineInfo" class="info-text hidden">
+                📌 <strong>Modo Offline / HTML directo</strong><br>
+                Podés pegar:<br>
+                • Texto normal → Se generará un informe con tablas automáticas.<br>
+                • <strong>Código HTML completo (como el que genera la IA)</strong> → Se renderizará tal cual, con gráficos y tablas.
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            📝 Paso 1: Ingresá tu contenido
+        </div>
+        <div class="card-body">
+            <label>📌 Título (opcional)</label>
+            <input type="text" id="titulo" placeholder="Ej: Anexo Correctivo - Gestión de Flota">
+
+            <label>📝 Subtítulo (opcional)</label>
+            <input type="text" id="subtitulo" placeholder="Ej: Mayo 2026">
+
+            <label>📄 Texto o código a procesar</label>
+            <textarea id="contenido" placeholder='Pegá acá:\n\n- Texto normal con números para análisis automático\n- O código HTML completo (el que te da la IA con gráficos y tablas)'></textarea>
+
+            <button id="generarBtn">📄 Generar Informe</button>
+        </div>
+    </div>
+
+    <div class="result-panel" id="resultPanel" style="display: none;">
+        <div class="result-header">
+            📄 Informe Generado
+            <button id="downloadPdfBtn" style="float: right; background: #28a745; padding: 5px 15px; margin-top: -5px;">📥 Descargar PDF</button>
+        </div>
+        <div class="result-content" id="resultContent">
+            <!-- Acá se mostrará el resultado: texto o HTML renderizado -->
+        </div>
+    </div>
+</div>
+
+<script>
+    // Elementos
+    const modeIaBtn = document.getElementById('modeIaBtn');
+    const modeOfflineBtn = document.getElementById('modeOfflineBtn');
+    const iaConfigSection = document.getElementById('iaConfigSection');
+    const offlineInfo = document.getElementById('offlineInfo');
+    const apiKeyInput = document.getElementById('apiKey');
+    const testApiBtn = document.getElementById('testApiBtn');
+    const saveConfigBtn = document.getElementById('saveConfigBtn');
+    const generarBtn = document.getElementById('generarBtn');
+    const downloadPdfBtn = document.getElementById('downloadPdfBtn');
+    const resultPanel = document.getElementById('resultPanel');
+    const resultContent = document.getElementById('resultContent');
+    const tituloInput = document.getElementById('titulo');
+    const subtituloInput = document.getElementById('subtitulo');
+    const contenidoTextarea = document.getElementById('contenido');
+
+    let modoActual = 'ia'; // 'ia' o 'offline'
+
+    // Cambiar modo
+    modeIaBtn.onclick = () => {
+        modoActual = 'ia';
+        modeIaBtn.classList.add('active');
+        modeOfflineBtn.classList.remove('active');
+        iaConfigSection.classList.remove('hidden');
+        offlineInfo.classList.add('hidden');
+    };
+
+    modeOfflineBtn.onclick = () => {
+        modoActual = 'offline';
+        modeOfflineBtn.classList.add('active');
+        modeIaBtn.classList.remove('active');
+        iaConfigSection.classList.add('hidden');
+        offlineInfo.classList.remove('hidden');
+    };
+
+    // Cargar API Key guardada
+    if (localStorage.getItem('gemini_api_key')) {
+        apiKeyInput.value = localStorage.getItem('gemini_api_key');
+    }
+
+    saveConfigBtn.onclick = () => {
+        const key = apiKeyInput.value.trim();
+        if (key) {
+            localStorage.setItem('gemini_api_key', key);
+            alert('✅ API Key guardada correctamente');
+        } else {
+            alert('❌ Ingresá una API Key válida');
+        }
+    };
+
+    testApiBtn.onclick = async () => {
+        const key = apiKeyInput.value.trim();
+        if (!key) {
+            alert('Primero ingresá y guardá tu API Key');
+            return;
+        }
+        alert('🔍 Probando conexión...');
+        // Test simple
+        try {
+            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${key}`);
+            if (response.ok) {
+                alert('✅ Conexión exitosa. Tu API Key funciona.');
+            } else {
+                alert('❌ Error de conexión. Verificá tu API Key.');
+            }
+        } catch(e) {
+            alert('❌ Error de red. Verificá tu conexión.');
+        }
+    };
+
+    // Función para detectar si el contenido es HTML
+    function esHTML(texto) {
+        const trimmed = texto.trim();
+        return trimmed.startsWith('<!DOCTYPE html>') || 
+               trimmed.startsWith('<html') ||
+               (trimmed.startsWith('<') && trimmed.includes('<body')) ||
+               (trimmed.includes('<div') && trimmed.includes('<style'));
+    }
+
+    // Renderizar el informe
+    async function generarInforme() {
+        const titulo = tituloInput.value;
+        const subtitulo = subtituloInput.value;
+        let contenido = contenidoTextarea.value;
+
+        if (!contenido.trim()) {
+            alert('Por favor, ingresá contenido (texto o código HTML)');
+            return;
+        }
+
+        resultPanel.style.display = 'block';
+        resultContent.innerHTML = '<div style="text-align:center; padding:50px;">⏳ Procesando...<br>Generando informe...</div>';
+
+        // Detectar si es HTML
+        if (esHTML(contenido)) {
+            // Modo HTML directo: renderizarlo tal cual
+            resultContent.innerHTML = contenido;
+            // Ajustar para que los gráficos se carguen correctamente
+            // Re-ejecutar scripts dentro del contenido
+            const scripts = resultContent.getElementsByTagName('script');
+            for (let i = 0; i < scripts.length; i++) {
+                const script = document.createElement('script');
+                if (scripts[i].src) {
+                    script.src = scripts[i].src;
+                } else {
+                    script.textContent = scripts[i].textContent;
+                }
+                document.body.appendChild(script);
+                document.body.removeChild(script);
+            }
+            return;
+        }
+
+        // Si no es HTML, procesar según modo
+        if (modoActual === 'offline') {
+            // Modo offline: extraer números y crear tabla simple
+            const numeros = extraerNumeros(contenido);
+            let htmlGenerado = `
+                <div style="font-family: Arial, sans-serif; max-width: 900px; margin: 0 auto;">
+                    ${titulo ? `<h1 style="color: #1e3a5f;">${titulo}</h1>` : ''}
+                    ${subtitulo ? `<h3 style="color: #6c757d;">${subtitulo}</h3>` : ''}
+                    <div style="background: #f8f9fa; padding: 20px; border-radius: 12px; margin: 20px 0;">
+                        <h3>📊 Resumen del contenido</h3>
+                        <p>${contenido.replace(/\n/g, '<br>')}</p>
+                    </div>
+            `;
+            if (Object.keys(numeros).length > 0) {
+                htmlGenerado += `<h3>📈 Datos numéricos detectados</h3><table style="width:100%; border-collapse:collapse;"><tr style="background:#1e3a5f; color:white;"><th style="padding:8px;">Concepto</th><th style="padding:8px;">Valor</th></tr>`;
+                for (const [k, v] of Object.entries(numeros)) {
+                    htmlGenerado += `<tr><td style="border:1px solid #ddd; padding:8px;">${k}</td><td style="border:1px solid #ddd; padding:8px;">${v}</td></tr>`;
+                }
+                htmlGenerado += `</table>`;
+            }
+            htmlGenerado += `<p style="margin-top: 30px; font-size: 12px; color: #999;">📌 Informe generado en modo offline</p></div>`;
+            resultContent.innerHTML = htmlGenerado;
+        } else {
+            // Modo IA: llamar a Gemini
+            const apiKey = localStorage.getItem('gemini_api_key');
+            if (!apiKey) {
+                resultContent.innerHTML = '<div class="alert alert-error">❌ No hay API Key configurada. Guardá tu clave en la configuración.</div>';
+                return;
+            }
+
+            try {
+                const prompt = `Generá un informe profesional HTML (no incluyas <html> ni <body>, solo el contenido interno) con los siguientes datos. Incluí tablas, gráficos (usando divs con estilos) y estructura clara. Datos: ${contenido.substring(0, 3000)}. Título: ${titulo || 'Informe'}. Subtítulo: ${subtitulo || ''}. Usá colores corporativos (azul oscuro #1e3a5f y gris).`;
+                
+                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: prompt }] }]
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Error en la API');
+                }
+                
+                const data = await response.json();
+                let htmlGenerado = data.candidates?.[0]?.content?.parts?.[0]?.text || '<p>No se pudo generar el informe.</p>';
+                htmlGenerado = htmlGenerado.replace(/```html/g, '').replace(/```/g, '');
+                resultContent.innerHTML = htmlGenerado;
+            } catch (error) {
+                resultContent.innerHTML = `<div class="alert alert-error">❌ Error al generar el informe con IA. Verificá tu API Key o conectate a internet.<br><br>💡 Tip: Usá "Modo Offline" si no tenés conexión o pegá directamente HTML.</div>`;
+            }
+        }
+    }
+
+    // Función auxiliar para extraer números
+    function extraerNumeros(texto) {
+        const numeros = {};
+        const lines = texto.split('\n');
+        for (let line of lines) {
+            const match = line.match(/([A-Za-zÁÉÍÓÚñÑ\s]+):?\s*\$?(\d+(?:\.\d+)?)/i);
+            if (match) {
+                numeros[match[1].trim()] = match[2];
+            }
+        }
+        return numeros;
+    }
+
+    // Generar al hacer clic
+    generarBtn.onclick = generarInforme;
+
+    // Descargar PDF del resultado
+    downloadPdfBtn.onclick = async () => {
+        const contentToPrint = resultContent.innerHTML;
+        if (!contentToPrint || contentToPrint.includes('Procesando')) {
+            alert('Primero generá un informe');
+            return;
+        }
+
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = `<div style="padding: 2.5cm; background: white; font-family: Arial;">${contentToPrint}</div>`;
+        tempDiv.style.position = 'absolute';
+        tempDiv.style.left = '-9999px';
+        document.body.appendChild(tempDiv);
+
+        try {
+            const opt = {
+                margin: [0.5, 0.5, 0.5, 0.5],
+                filename: 'informe_flota.pdf',
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { scale: 2 },
+                jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
+            };
+            await html2pdf().set(opt).from(tempDiv).save();
+            alert('✅ PDF descargado');
+        } catch(e) {
+            alert('❌ Error al generar PDF. Usá Ctrl+P desde el navegador.');
+        } finally {
+            document.body.removeChild(tempDiv);
+        }
+    };
+</script>
+</body>
+</html>
