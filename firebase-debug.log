@@ -1,0 +1,104 @@
+[debug] [2026-08-25T05:25:48.821Z] ----------------------------------------------------------------------
+[debug] [2026-08-25T05:25:48.824Z] Command:       /usr/local/nvm/versions/node/v24.19.0/bin/node /usr/local/node_packages/node_modules/.bin/firebase init hosting
+[debug] [2026-08-25T05:25:48.825Z] CLI Version:   15.27.0
+[debug] [2026-08-25T05:25:48.825Z] Platform:      linux
+[debug] [2026-08-25T05:25:48.826Z] Node Version:  v24.19.0
+[debug] [2026-08-25T05:25:48.826Z] Detected Agent: unknown
+[debug] [2026-08-25T05:25:48.826Z] Time:          Tue Aug 25 2026 05:25:48 GMT+0000 (Coordinated Universal Time)
+[debug] [2026-08-25T05:25:48.826Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2026-08-25T05:25:48.850Z] >>> [apiv2][query] GET https://firebase-public.firebaseio.com/cli.json [none]
+[debug] [2026-08-25T05:25:48.851Z] >>> [apiv2][(partial)header] GET https://firebase-public.firebaseio.com/cli.json  x-goog-user-project=project-e503fb62-86f9-48a2-b92
+[info] 
+     ######## #### ########  ######## ########     ###     ######  ########
+     ##        ##  ##     ## ##       ##     ##  ##   ##  ##       ##
+     ######    ##  ########  ######   ########  #########  ######  ######
+     ##        ##  ##    ##  ##       ##     ## ##     ##       ## ##
+     ##       #### ##     ## ######## ########  ##     ##  ######  ########
+
+You're about to initialize a Firebase project in this directory:
+
+  /home/alewilczek
+
+Before we get started, keep in mind:
+
+  * You are initializing within an existing Firebase project directory
+
+[info] 
+=== Project Setup
+[info] 
+[info] First, let's associate this project directory with a Firebase project.
+[info] You can create multiple project aliases by running firebase use --add, 
+[info] 
+[debug] [2026-08-25T05:25:52.286Z] <<< [apiv2][status] GET https://firebase-public.firebaseio.com/cli.json 200
+[debug] [2026-08-25T05:25:52.286Z] <<< [apiv2][body] GET https://firebase-public.firebaseio.com/cli.json {"cloudBuildErrorAfter":1594252800000,"cloudBuildWarnAfter":1590019200000,"defaultNode10After":1594252800000,"minVersion":"3.0.5","node8DeploysDisabledAfter":1613390400000,"node8RuntimeDisabledAfter":1615809600000,"node8WarnAfter":1600128000000}
+[debug] [2026-08-25T05:26:05.461Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2026-08-25T05:26:05.462Z] > authorizing via signed-in user (alewilczek@gmail.com)
+[debug] [2026-08-25T05:26:05.463Z] Checked if tokens are valid: false, expires at: 1785353328241
+[debug] [2026-08-25T05:26:05.463Z] Checked if tokens are valid: false, expires at: 1785353328241
+[debug] [2026-08-25T05:26:05.463Z] > refreshing access token with scopes: []
+[debug] [2026-08-25T05:26:05.465Z] >>> [apiv2][query] POST https://www.googleapis.com/oauth2/v3/token [none]
+[debug] [2026-08-25T05:26:05.465Z] >>> [apiv2][(partial)header] POST https://www.googleapis.com/oauth2/v3/token  x-goog-user-project=project-e503fb62-86f9-48a2-b92
+[debug] [2026-08-25T05:26:05.466Z] >>> [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2026-08-25T05:26:05.534Z] <<< [apiv2][status] POST https://www.googleapis.com/oauth2/v3/token 200
+[debug] [2026-08-25T05:26:05.535Z] <<< [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2026-08-25T05:26:05.548Z] >>> [apiv2][query] GET https://firebase.googleapis.com/v1beta1/projects pageSize=100
+[debug] [2026-08-25T05:26:05.548Z] >>> [apiv2][(partial)header] GET https://firebase.googleapis.com/v1beta1/projects  x-goog-user-project=project-e503fb62-86f9-48a2-b92
+[debug] [2026-08-25T05:26:05.907Z] <<< [apiv2][status] GET https://firebase.googleapis.com/v1beta1/projects 200
+[debug] [2026-08-25T05:26:05.907Z] <<< [apiv2][body] GET https://firebase.googleapis.com/v1beta1/projects [omitted]
+[debug] [2026-08-25T05:26:50.940Z] ExitPromptError: User force closed the prompt with SIGINT
+    at Interface.sigint (/usr/local/node_packages/node_modules/@inquirer/select/node_modules/@inquirer/core/dist/commonjs/lib/create-prompt.js:101:37)
+    at Interface.emit (node:events:509:28)
+    at [_ttyWrite] [as _ttyWrite] (node:internal/readline/interface:1327:18)
+    at ReadStream.onkeypress (node:internal/readline/interface:284:20)
+    at ReadStream.emit (node:events:521:24)
+    at emitKeys (node:internal/readline/utils:371:14)
+    at emitKeys.next (<anonymous>)
+    at ReadStream.onData (node:internal/readline/emitKeypressEvents:64:36)
+    at ReadStream.emit (node:events:509:28)
+    at addChunk (node:internal/streams/readable:563:12)
+[error] 
+[error] Error: An unexpected error has occurred.
+[debug] [2026-08-25T05:27:09.743Z] ----------------------------------------------------------------------
+[debug] [2026-08-25T05:27:09.746Z] Command:       /usr/local/nvm/versions/node/v24.19.0/bin/node /usr/local/node_packages/node_modules/.bin/firebase init hosting
+[debug] [2026-08-25T05:27:09.747Z] CLI Version:   15.27.0
+[debug] [2026-08-25T05:27:09.747Z] Platform:      linux
+[debug] [2026-08-25T05:27:09.747Z] Node Version:  v24.19.0
+[debug] [2026-08-25T05:27:09.748Z] Detected Agent: unknown
+[debug] [2026-08-25T05:27:09.748Z] Time:          Tue Aug 25 2026 05:27:09 GMT+0000 (Coordinated Universal Time)
+[debug] [2026-08-25T05:27:09.748Z] ----------------------------------------------------------------------
+[debug] 
+[info] 
+     ######## #### ########  ######## ########     ###     ######  ########
+     ##        ##  ##     ## ##       ##     ##  ##   ##  ##       ##
+     ######    ##  ########  ######   ########  #########  ######  ######
+     ##        ##  ##    ##  ##       ##     ## ##     ##       ## ##
+     ##       #### ##     ## ######## ########  ##     ##  ######  ########
+
+You're about to initialize a Firebase project in this directory:
+
+  /home/alewilczek
+
+Before we get started, keep in mind:
+
+  * You are initializing within an existing Firebase project directory
+
+[info] 
+=== Project Setup
+[info] 
+[info] First, let's associate this project directory with a Firebase project.
+[info] You can create multiple project aliases by running firebase use --add, 
+[info] 
+[debug] [2026-08-25T05:27:34.239Z] ExitPromptError: User force closed the prompt with SIGINT
+    at Interface.sigint (/usr/local/node_packages/node_modules/@inquirer/select/node_modules/@inquirer/core/dist/commonjs/lib/create-prompt.js:101:37)
+    at Interface.emit (node:events:509:28)
+    at [_ttyWrite] [as _ttyWrite] (node:internal/readline/interface:1327:18)
+    at ReadStream.onkeypress (node:internal/readline/interface:284:20)
+    at ReadStream.emit (node:events:521:24)
+    at emitKeys (node:internal/readline/utils:371:14)
+    at emitKeys.next (<anonymous>)
+    at ReadStream.onData (node:internal/readline/emitKeypressEvents:64:36)
+    at ReadStream.emit (node:events:509:28)
+    at addChunk (node:internal/streams/readable:563:12)
+[error] 
+[error] Error: An unexpected error has occurred.

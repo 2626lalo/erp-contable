@@ -1,5 +1,5 @@
 {
-    "version": "5.2.2",
-    "fecha": "2025-05-09",
-    "cambios": "Nueva funcionalidad: Trabajo Tercerizado con costo de proveedor, cálculo de ganancia real sobre diferencia"
+    "version": "7.0.0",
+    "fecha": "2025-08-25",
+    "cambios": "ERP completo: Compras con stock, Presupuestos con trazabilidad, Ventas Order-to-Cash, Tesorería con historial mensual, Configuración completa, Gastos Personales corregido, Firebase integrado (fallback a localStorage)"
 }

@@ -225,3 +225,28 @@ export function importarConfiguracionImpuestos(config) {
     }
     return false;
 }
+
+// ==================== HISTORIAL DE TESORERIA ====================
+export function guardarSnapshotTesoreria(snapshot) {
+    const db = getDB();
+    if (!db.historialTesoreria) db.historialTesoreria = [];
+    // Evitar duplicados del mismo mes
+    const index = db.historialTesoreria.findIndex(h => h.mes === snapshot.mes);
+    if (index !== -1) {
+        db.historialTesoreria[index] = snapshot;
+    } else {
+        db.historialTesoreria.push(snapshot);
+    }
+    guardarDB();
+    return true;
+}
+
+export function obtenerHistorialTesoreria() {
+    const db = getDB();
+    return db.historialTesoreria || [];
+}
+
+export function obtenerSnapshotPorMes(mes) {
+    const db = getDB();
+    return (db.historialTesoreria || []).find(h => h.mes === mes) || null;
+}
