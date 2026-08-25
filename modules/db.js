@@ -250,3 +250,20 @@ export function obtenerSnapshotPorMes(mes) {
     const db = getDB();
     return (db.historialTesoreria || []).find(h => h.mes === mes) || null;
 }
+
+// ==================== PRESUPUESTOS CON PADRE ====================
+// Esta función se ejecuta al cargar la DB y asegura que los presupuestos tengan el campo padre
+export function asegurarCamposPresupuesto() {
+    const db = getDB();
+    if (db.presupuestos) {
+        let modificado = false;
+        db.presupuestos = db.presupuestos.map(p => {
+            if (!p.presupuestoPadreId) {
+                p.presupuestoPadreId = null;
+                modificado = true;
+            }
+            return p;
+        });
+        if (modificado) guardarDB();
+    }
+}

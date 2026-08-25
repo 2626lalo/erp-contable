@@ -1,4 +1,4 @@
-import { getDB, guardarDB, getImpuestosActivos } from './db.js';
+import { getDB, guardarDB, getImpuestosActivos, asegurarCamposPresupuesto } from './db.js';
 import { formatNumber, mostrarNotificacion, generarId, escapeHtml, formatDate } from './utils.js';
 
 let itemsPresupuesto = [];
@@ -106,6 +106,7 @@ function calcularGananciaReal(montoVentaCliente, costoProveedor) {
 
 // ==================== RENDER PRINCIPAL ====================
 export function renderPresupuestos() {
+    asegurarCamposPresupuesto(); // Asegurar que todos los presupuestos tengan el campo padre
     const db = getDB();
     return `
         <div class="space-y-5 fade-in pb-24">
@@ -120,7 +121,8 @@ export function renderPresupuestos() {
                             <div>
                                 <h3 class="font-bold">${escapeHtml(p.cliente)}</h3>
                                 <p class="text-sm">Total: $${formatNumber(p.total)} | ${p.numero}</p>
-                                <p class="text-xs text-gray-500">${p.fechaCreacion?.split('T')[0]}</p>
+                                <p class="text-xs text-gray-500">${p.fechaCreacion ? formatDate(p.fechaCreacion) : ''}</p>
+                                ${p.presupuestoPadreId ? `<p class="text-xs text-blue-500">Adicional de: P-${p.presupuestoPadreId}</p>` : ''}
                             </div>
                             <div class="flex gap-2">
                                 <button onclick="event.stopPropagation();window.descargarPDFPresupuesto(${p.id})" class="bg-blue-100 text-blue-700 px-3 py-1 rounded-xl text-sm">📄 PDF</button>
@@ -142,7 +144,7 @@ window.mostrarModalNuevoPresupuesto = () => {
     usarMarkupGlobal = true;
     incluirIVA = true;
     esTercerizado = true;
-    mostrarEditorPresupuesto();
+    mostrarEditorPresupuesto(null); // Sin presupuesto padre
 };
 
 window.mostrarModalCargarPDF = () => {
@@ -150,137 +152,18 @@ window.mostrarModalCargarPDF = () => {
     window.mostrarModalNuevoPresupuesto();
 };
 
-function getCostoTotalProveedor() {
-    return itemsPresupuesto.reduce((sum, item) => sum + (item.costo * item.cant), 0);
-}
-
-function getVentaTotalCliente() {
-    let total = 0;
-    itemsPresupuesto.forEach(item => {
-        const markup = usarMarkupGlobal ? markupGlobal : (item.markup || 0);
-        total += item.costo * (1 + markup/100) * item.cant;
-    });
-    return total;
-}
-
-// ==================== GENERAR PDF FORMAL ====================
-window.descargarPDFPresupuesto = (id) => {
-    const db = getDB();
-    const p = db.presupuestos.find(x => x.id === id);
-    if (!p) { mostrarNotificacion('Presupuesto no encontrado', 'error'); return; }
-    const empresa = db.empresas?.[0] || { nombre: 'Mi Empresa SRL', cuit: '30-12345678-9', direccion: 'Av. Corrientes 123', telefono: '11-1234-5678', email: 'info@miempresa.com', logo: '🏢' };
-    let itemsHTML = '';
-    p.items.forEach(item => {
-        const markup = p.usarMarkupGlobal ? p.markupGlobal : (item.markup || 0);
-        const precioVenta = item.costo * (1 + markup/100);
-        itemsHTML += `<tr>
-            <td style="padding:8px;border:1px solid #ddd;">${item.nro}</td>
-            <td style="padding:8px;border:1px solid #ddd;">${escapeHtml(item.desc)}</td>
-            <td style="padding:8px;border:1px solid #ddd;text-align:center;">${item.cant}</td>
-            <td style="padding:8px;border:1px solid #ddd;text-align:right;">$${formatNumber(precioVenta)}</td>
-            <td style="padding:8px;border:1px solid #ddd;text-align:right;">$${formatNumber(precioVenta * item.cant)}</td>
-        </tr>`;
-    });
-    const ventaTotal = p.ventaCliente || 0;
-    const iva = p.iva || 0;
-    const totalConIVA = p.total || ventaTotal + iva;
-
-    const ventana = window.open('', '_blank', 'width=900,height=700');
-    ventana.document.write(`
-        <html><head><title>Presupuesto ${p.numero}</title>
-        <style>
-            body { font-family: Arial, sans-serif; padding:40px; max-width:900px; margin:0 auto; color:#333; }
-            .header { text-align:center; border-bottom:3px solid #1e3a8a; padding-bottom:20px; margin-bottom:30px; }
-            .header h1 { color:#1e3a8a; margin:0; font-size:28px; }
-            .header p { margin:5px 0; color:#555; }
-            .datos-cliente { background:#f8f9fa; padding:15px; border-radius:8px; margin-bottom:20px; }
-            table { width:100%; border-collapse:collapse; margin:20px 0; }
-            th { background:#1e3a8a; color:white; padding:10px; text-align:left; }
-            td { padding:8px; border:1px solid #ddd; }
-            .total-section { text-align:right; margin-top:20px; padding:20px; background:#f1f5f9; border-radius:8px; }
-            .total-section h2 { color:#1e3a8a; }
-            .vigencia { color:#666; font-style:italic; }
-            .nota { font-size:12px; color:#888; margin-top:30px; border-top:1px solid #eee; padding-top:20px; }
-            @media print { .no-print { display:none; } }
-        </style></head>
-        <body>
-            <div class="header">
-                <h1>${empresa.nombre || 'Mi Empresa'}</h1>
-                <p>CUIT: ${empresa.cuit || '30-12345678-9'} | ${empresa.direccion || ''}</p>
-                <p>Tel: ${empresa.telefono || ''} | Email: ${empresa.email || ''}</p>
-                <p style="font-size:18px;font-weight:bold;margin-top:10px;">PRESUPUESTO Nº ${p.numero}</p>
-            </div>
-            <div class="datos-cliente">
-                <p><strong>Cliente:</strong> ${escapeHtml(p.cliente)}</p>
-                <p><strong>Vigencia:</strong> ${p.vigencia || getVigenciaTexto()}</p>
-                ${p.patente ? `<p><strong>Patente:</strong> ${p.patente}</p>` : ''}
-                ${p.centroCosto ? `<p><strong>Centro de Costo:</strong> ${p.centroCosto}</p>` : ''}
-            </div>
-            <table><thead><tr><th>#</th><th>Producto/Servicio</th><th>Cant.</th><th>Precio Unit.</th><th>Subtotal</th></tr></thead><tbody>${itemsHTML}</tbody></table>
-            <div class="total-section">
-                <p><strong>Subtotal (sin IVA):</strong> $${formatNumber(ventaTotal)}</p>
-                ${p.incluirIVA ? `<p><strong>IVA 21%:</strong> $${formatNumber(iva)}</p>` : ''}
-                <h2>TOTAL: $${formatNumber(totalConIVA)}</h2>
-            </div>
-            <p class="vigencia">${p.vigencia || getVigenciaTexto()}</p>
-            ${p.comentarios ? `<div class="nota"><strong>Observaciones:</strong> ${escapeHtml(p.comentarios)}</div>` : ''}
-            <div class="no-print" style="margin-top:30px;text-align:center;">
-                <button onclick="window.print()" style="padding:12px 30px;background:#1e3a8a;color:white;border:none;border-radius:8px;font-size:16px;cursor:pointer;">🖨️ Imprimir / Guardar PDF</button>
-                <button onclick="window.close()" style="padding:12px 30px;background:#6b7280;color:white;border:none;border-radius:8px;font-size:16px;cursor:pointer;margin-left:10px;">Cerrar</button>
-            </div>
-        </body></html>
-    `);
-    ventana.document.close();
-};
-
-// ==================== VER DETALLE ====================
-window.verPresupuestoDetalle = (id) => {
-    const db = getDB();
-    const p = db.presupuestos.find(x => x.id === id);
-    if (!p) return;
-    document.getElementById('root').innerHTML = `
-        <div class="bg-white dark:bg-gray-800 p-5 rounded-2xl shadow-lg max-w-4xl mx-auto">
-            <button onclick="window.dispatchEvent(new Event('refreshView'))" class="text-gray-600 dark:text-gray-300 mb-4">← Volver</button>
-            <h2 class="text-xl font-bold mb-2">Presupuesto ${p.numero}</h2>
-            <div class="grid grid-cols-2 gap-2 text-sm mb-4">
-                <p><strong>Cliente:</strong> ${escapeHtml(p.cliente)}</p>
-                <p><strong>Total con IVA:</strong> $${formatNumber(p.total)}</p>
-                <p><strong>Ganancia Neta Real:</strong> $${formatNumber(p.gananciaNetaReal || 0)}</p>
-                <p><strong>Fecha:</strong> ${new Date(p.fechaCreacion).toLocaleDateString()}</p>
-            </div>
-            <div class="flex gap-3">
-                <button onclick="window.descargarPDFPresupuesto(${p.id})" class="bg-blue-600 text-white px-4 py-2 rounded-xl flex-1">📄 Ver / Descargar PDF</button>
-                <button onclick="window.eliminarPresupuesto(${p.id})" class="bg-red-600 text-white px-4 py-2 rounded-xl flex-1">🗑️ Eliminar</button>
-            </div>
-        </div>`;
-};
-
-// ==================== ELIMINAR (con liberación de stock) ====================
-window.eliminarPresupuesto = (id) => {
-    if (!confirm('¿Eliminar este presupuesto?')) return;
-    const db = getDB();
-    const presupuesto = db.presupuestos.find(p => p.id === id);
-    if (presupuesto) {
-        // Liberar stock de cada ítem vinculado
-        if (presupuesto.items) {
-            presupuesto.items.forEach(item => {
-                if (item.compraVinculadaId && item.compraItemIndex && item.cantidadAsignada) {
-                    window.liberarStock(item.compraVinculadaId, item.compraItemIndex, item.cantidadAsignada);
-                }
-            });
-        }
-        db.presupuestos = db.presupuestos.filter(p => p.id !== id);
-        guardarDB();
-        mostrarNotificacion('Presupuesto eliminado y stock liberado', 'info');
-        window.dispatchEvent(new Event('refreshView'));
-    }
-};
-
 // ==================== EDITOR DE PRESUPUESTO ====================
-function mostrarEditorPresupuesto() {
+function mostrarEditorPresupuesto(padreId) {
     const db = getDB();
     const clientesOptions = db.clientes.map(c => `<option value="${c.id}">${escapeHtml(c.nombre)}</option>`).join('');
     const numeroPresupuesto = `P-${getProximoNumeroPresupuesto().toString().padStart(4, '0')}`;
+    
+    // Obtener lista de presupuestos existentes para el campo "Presupuesto Padre"
+    const presupuestosOptions = db.presupuestos
+        .filter(p => p.id !== padreId) // No permitir que sea padre de sí mismo
+        .map(p => `<option value="${p.id}" ${p.id === padreId ? 'selected' : ''}>${p.numero} - ${escapeHtml(p.cliente)}</option>`)
+        .join('');
+
     const costoTotal = getCostoTotalProveedor();
     const ventaTotal = getVentaTotalCliente();
     const gananciaBruta = ventaTotal - costoTotal;
@@ -305,6 +188,16 @@ function mostrarEditorPresupuesto() {
                         <div><label class="block font-medium mb-1">Patente</label><input type="text" id="patente" class="w-full p-2 border rounded-lg"></div>
                         <div><label class="block font-medium mb-1">Centro de Costo</label><input type="text" id="centroCosto" class="w-full p-2 border rounded-lg"></div>
                         <div><label class="block font-medium mb-1">Vigencia</label><input type="text" id="vigencia" value="${getVigenciaTexto()}" class="w-full p-2 border rounded-lg bg-gray-100" readonly></div>
+                    </div>
+
+                    <!-- NUEVO: Campo para Presupuesto Padre -->
+                    <div>
+                        <label class="block font-medium mb-1">📎 Presupuesto Padre (si es un adicional)</label>
+                        <select id="presupuestoPadre" class="w-full p-2 border rounded-lg">
+                            <option value="">Ninguno (presupuesto principal)</option>
+                            ${presupuestosOptions}
+                        </select>
+                        <p class="text-xs text-gray-400 mt-1">Si este presupuesto es un adicional de otro, seleccioná el presupuesto principal.</p>
                     </div>
                     
                     <div class="flex flex-wrap gap-4 p-3 bg-gray-100 rounded-lg">
@@ -438,7 +331,6 @@ function mostrarEditorPresupuesto() {
     };
 
     window.eliminarItem = (idx) => {
-        // Liberar stock si estaba vinculado
         const item = itemsPresupuesto[idx];
         if (item && item.compraVinculadaId && item.compraItemIndex && item.cantidadAsignada) {
             window.liberarStock(item.compraVinculadaId, item.compraItemIndex, item.cantidadAsignada);
@@ -517,11 +409,17 @@ function mostrarEditorPresupuesto() {
         const clienteId = parseInt(document.getElementById('clienteSelect').value);
         const cliente = db.clientes.find(c => c.id === clienteId);
         if (!cliente) { mostrarNotificacion('Seleccione un cliente', 'error'); return; }
+
+        // Obtener presupuesto padre seleccionado
+        const padreSelect = document.getElementById('presupuestoPadre');
+        const presupuestoPadreId = padreSelect.value ? parseInt(padreSelect.value) : null;
+
         const costoTotal = getCostoTotalProveedor();
         const ventaTotal = getVentaTotalCliente();
         const iva = ventaTotal * 0.21;
         const gn = calcularGananciaReal(ventaTotal, costoTotal);
-        db.presupuestos.push({
+
+        const nuevoPresupuesto = {
             id: generarId(),
             numero: numeroPresupuesto,
             clienteId: cliente.id,
@@ -538,10 +436,22 @@ function mostrarEditorPresupuesto() {
             gananciaNetaReal: gn.gananciaNeta,
             iva: incluirIVA ? iva : 0,
             total: incluirIVA ? ventaTotal + iva : ventaTotal,
-            fechaCreacion: new Date().toISOString()
-        });
+            fechaCreacion: new Date().toISOString(),
+            presupuestoPadreId: presupuestoPadreId, // NUEVO
+            ventaGeneradaId: null
+        };
+
+        db.presupuestos.push(nuevoPresupuesto);
         guardarDB();
-        mostrarNotificacion(`Presupuesto ${numeroPresupuesto} guardado`, 'success');
+
+        // Si tiene padre, mostrar notificación especial
+        if (presupuestoPadreId) {
+            const padre = db.presupuestos.find(p => p.id === presupuestoPadreId);
+            mostrarNotificacion(`✅ Presupuesto ${numeroPresupuesto} guardado como adicional de ${padre ? padre.numero : ''}`, 'success');
+        } else {
+            mostrarNotificacion(`✅ Presupuesto ${numeroPresupuesto} guardado`, 'success');
+        }
+
         window.dispatchEvent(new Event('refreshView'));
     };
 
@@ -694,5 +604,276 @@ function mostrarEditorPresupuesto() {
     window.toggleModoMarkup();
     renderizarTodo();
 }
+
+// ==================== GENERAR PDF FORMAL ====================
+window.descargarPDFPresupuesto = (id) => {
+    const db = getDB();
+    const p = db.presupuestos.find(x => x.id === id);
+    if (!p) { mostrarNotificacion('Presupuesto no encontrado', 'error'); return; }
+    const empresa = db.empresas?.[0] || { nombre: 'Mi Empresa SRL', cuit: '30-12345678-9', direccion: 'Av. Corrientes 123', telefono: '11-1234-5678', email: 'info@miempresa.com', logo: '🏢' };
+    let itemsHTML = '';
+    p.items.forEach(item => {
+        const markup = p.usarMarkupGlobal ? p.markupGlobal : (item.markup || 0);
+        const precioVenta = item.costo * (1 + markup/100);
+        itemsHTML += `<tr>
+            <td style="padding:8px;border:1px solid #ddd;">${item.nro}</td>
+            <td style="padding:8px;border:1px solid #ddd;">${escapeHtml(item.desc)}</td>
+            <td style="padding:8px;border:1px solid #ddd;text-align:center;">${item.cant}</td>
+            <td style="padding:8px;border:1px solid #ddd;text-align:right;">$${formatNumber(precioVenta)}</td>
+            <td style="padding:8px;border:1px solid #ddd;text-align:right;">$${formatNumber(precioVenta * item.cant)}</td>
+        </tr>`;
+    });
+    const ventaTotal = p.ventaCliente || 0;
+    const iva = p.iva || 0;
+    const totalConIVA = p.total || ventaTotal + iva;
+
+    const ventana = window.open('', '_blank', 'width=900,height=700');
+    ventana.document.write(`
+        <html><head><title>Presupuesto ${p.numero}</title>
+        <style>
+            body { font-family: Arial, sans-serif; padding:40px; max-width:900px; margin:0 auto; color:#333; }
+            .header { text-align:center; border-bottom:3px solid #1e3a8a; padding-bottom:20px; margin-bottom:30px; }
+            .header h1 { color:#1e3a8a; margin:0; font-size:28px; }
+            .header p { margin:5px 0; color:#555; }
+            .datos-cliente { background:#f8f9fa; padding:15px; border-radius:8px; margin-bottom:20px; }
+            table { width:100%; border-collapse:collapse; margin:20px 0; }
+            th { background:#1e3a8a; color:white; padding:10px; text-align:left; }
+            td { padding:8px; border:1px solid #ddd; }
+            .total-section { text-align:right; margin-top:20px; padding:20px; background:#f1f5f9; border-radius:8px; }
+            .total-section h2 { color:#1e3a8a; }
+            .vigencia { color:#666; font-style:italic; }
+            .nota { font-size:12px; color:#888; margin-top:30px; border-top:1px solid #eee; padding-top:20px; }
+            @media print { .no-print { display:none; } }
+        </style></head>
+        <body>
+            <div class="header">
+                <h1>${empresa.nombre || 'Mi Empresa'}</h1>
+                <p>CUIT: ${empresa.cuit || '30-12345678-9'} | ${empresa.direccion || ''}</p>
+                <p>Tel: ${empresa.telefono || ''} | Email: ${empresa.email || ''}</p>
+                <p style="font-size:18px;font-weight:bold;margin-top:10px;">PRESUPUESTO Nº ${p.numero}</p>
+            </div>
+            <div class="datos-cliente">
+                <p><strong>Cliente:</strong> ${escapeHtml(p.cliente)}</p>
+                <p><strong>Vigencia:</strong> ${p.vigencia || getVigenciaTexto()}</p>
+                ${p.patente ? `<p><strong>Patente:</strong> ${p.patente}</p>` : ''}
+                ${p.centroCosto ? `<p><strong>Centro de Costo:</strong> ${p.centroCosto}</p>` : ''}
+                ${p.presupuestoPadreId ? `<p><strong>Adicional de presupuesto:</strong> P-${p.presupuestoPadreId}</p>` : ''}
+            </div>
+            <table><thead><tr><th>#</th><th>Producto/Servicio</th><th>Cant.</th><th>Precio Unit.</th><th>Subtotal</th></tr></thead><tbody>${itemsHTML}</tbody></table>
+            <div class="total-section">
+                <p><strong>Subtotal (sin IVA):</strong> $${formatNumber(ventaTotal)}</p>
+                ${p.incluirIVA ? `<p><strong>IVA 21%:</strong> $${formatNumber(iva)}</p>` : ''}
+                <h2>TOTAL: $${formatNumber(totalConIVA)}</h2>
+            </div>
+            <p class="vigencia">${p.vigencia || getVigenciaTexto()}</p>
+            ${p.comentarios ? `<div class="nota"><strong>Observaciones:</strong> ${escapeHtml(p.comentarios)}</div>` : ''}
+            <div class="no-print" style="margin-top:30px;text-align:center;">
+                <button onclick="window.print()" style="padding:12px 30px;background:#1e3a8a;color:white;border:none;border-radius:8px;font-size:16px;cursor:pointer;">🖨️ Imprimir / Guardar PDF</button>
+                <button onclick="window.close()" style="padding:12px 30px;background:#6b7280;color:white;border:none;border-radius:8px;font-size:16px;cursor:pointer;margin-left:10px;">Cerrar</button>
+            </div>
+        </body></html>
+    `);
+    ventana.document.close();
+};
+
+// ==================== VER DETALLE ====================
+window.verPresupuestoDetalle = (id) => {
+    const db = getDB();
+    const p = db.presupuestos.find(x => x.id === id);
+    if (!p) return;
+
+    // Buscar hijos (presupuestos que tengan este como padre)
+    const hijos = db.presupuestos.filter(h => h.presupuestoPadreId === id);
+
+    document.getElementById('root').innerHTML = `
+        <div class="bg-white dark:bg-gray-800 p-5 rounded-2xl shadow-lg max-w-4xl mx-auto">
+            <button onclick="window.dispatchEvent(new Event('refreshView'))" class="text-gray-600 dark:text-gray-300 mb-4">← Volver</button>
+            <h2 class="text-xl font-bold mb-2">Presupuesto ${p.numero}</h2>
+            <div class="grid grid-cols-2 gap-2 text-sm mb-4">
+                <p><strong>Cliente:</strong> ${escapeHtml(p.cliente)}</p>
+                <p><strong>Total con IVA:</strong> $${formatNumber(p.total)}</p>
+                <p><strong>Ganancia Neta Real:</strong> $${formatNumber(p.gananciaNetaReal || 0)}</p>
+                <p><strong>Fecha:</strong> ${p.fechaCreacion ? formatDate(p.fechaCreacion) : ''}</p>
+                ${p.presupuestoPadreId ? `<p><strong>Presupuesto Padre:</strong> <a href="#" onclick="window.verPresupuestoDetalle(${p.presupuestoPadreId}); return false;" class="text-blue-600 underline">P-${p.presupuestoPadreId}</a></p>` : ''}
+                ${p.ventaGeneradaId ? `<p><strong>Venta generada:</strong> ID ${p.ventaGeneradaId}</p>` : ''}
+            </div>
+
+            ${hijos.length > 0 ? `
+                <div class="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                    <h3 class="font-bold text-blue-700">📎 Presupuestos adicionales vinculados</h3>
+                    ${hijos.map(h => `
+                        <div class="flex justify-between items-center border-b py-1">
+                            <span><a href="#" onclick="window.verPresupuestoDetalle(${h.id}); return false;" class="text-blue-600 underline">${h.numero}</a></span>
+                            <span class="text-sm">${escapeHtml(h.cliente)} - $${formatNumber(h.total)}</span>
+                        </div>
+                    `).join('')}
+                </div>
+            ` : ''}
+
+            <div class="flex gap-3 flex-wrap">
+                <button onclick="window.descargarPDFPresupuesto(${p.id})" class="bg-blue-600 text-white px-4 py-2 rounded-xl flex-1">📄 Ver / Descargar PDF</button>
+                <button onclick="window.eliminarPresupuesto(${p.id})" class="bg-red-600 text-white px-4 py-2 rounded-xl flex-1">🗑️ Eliminar</button>
+                ${!p.ventaGeneradaId ? `<button onclick="window.crearVentaDesdePresupuestoDirecto(${p.id})" class="bg-green-600 text-white px-4 py-2 rounded-xl flex-1">✅ Convertir en Venta</button>` : ''}
+            </div>
+        </div>`;
+};
+
+// ==================== ELIMINAR (con verificación de hijos) ====================
+window.eliminarPresupuesto = (id) => {
+    const db = getDB();
+    const presupuesto = db.presupuestos.find(p => p.id === id);
+    if (!presupuesto) return;
+
+    // Verificar si tiene hijos
+    const hijos = db.presupuestos.filter(h => h.presupuestoPadreId === id);
+    if (hijos.length > 0) {
+        if (!confirm(`Este presupuesto tiene ${hijos.length} adicional(es) vinculados. ¿Eliminarlo también eliminará los adicionales?`)) return;
+        // Eliminar hijos primero
+        hijos.forEach(h => {
+            db.presupuestos = db.presupuestos.filter(p => p.id !== h.id);
+            // Liberar stock de cada hijo
+            if (h.items) {
+                h.items.forEach(item => {
+                    if (item.compraVinculadaId && item.compraItemIndex && item.cantidadAsignada) {
+                        window.liberarStock(item.compraVinculadaId, item.compraItemIndex, item.cantidadAsignada);
+                    }
+                });
+            }
+        });
+    }
+
+    // Liberar stock del presupuesto principal
+    if (presupuesto.items) {
+        presupuesto.items.forEach(item => {
+            if (item.compraVinculadaId && item.compraItemIndex && item.cantidadAsignada) {
+                window.liberarStock(item.compraVinculadaId, item.compraItemIndex, item.cantidadAsignada);
+            }
+        });
+    }
+
+    db.presupuestos = db.presupuestos.filter(p => p.id !== id);
+    guardarDB();
+    mostrarNotificacion(`Presupuesto ${presupuesto.numero} y sus adicionales eliminados`, 'info');
+    window.dispatchEvent(new Event('refreshView'));
+};
+
+// ==================== CREAR VENTA DIRECTA DESDE PRESUPUESTO ====================
+window.crearVentaDesdePresupuestoDirecto = (presupuestoId) => {
+    const db = getDB();
+    const presupuesto = db.presupuestos.find(p => p.id === presupuestoId);
+    if (!presupuesto) { mostrarNotificacion('Presupuesto no encontrado', 'error'); return; }
+
+    // Similar a crear venta desde presupuesto, pero sin pasar por el modal de selección
+    if (db.ventas.some(v => v.presupuestoId === presupuestoId)) {
+        mostrarNotificacion('Este presupuesto ya tiene una venta asociada', 'warning');
+        return;
+    }
+
+    // Abrir modal para ingresar OC y factura
+    document.getElementById('root').innerHTML = `
+        <div class="modal">
+            <div class="modal-content w-full max-w-md">
+                <h2 class="text-xl font-bold mb-4">📄 Convertir Presupuesto en Venta</h2>
+                <div class="bg-gray-50 dark:bg-gray-800 p-3 rounded-xl mb-4">
+                    <p><strong>Cliente:</strong> ${escapeHtml(presupuesto.cliente)}</p>
+                    <p><strong>Presupuesto:</strong> ${presupuesto.numero}</p>
+                    <p><strong>Total:</strong> <span class="font-bold text-green-600">$${formatNumber(presupuesto.total)}</span></p>
+                </div>
+                <div class="space-y-3">
+                    <label class="block text-sm font-medium">📋 Número de Orden de Compra (OC)</label>
+                    <input type="text" id="ocClienteVenta" class="w-full p-3 border rounded-xl" placeholder="Ej: OC-2026-001">
+                    <label class="block text-sm font-medium">📅 Fecha de cobro esperada</label>
+                    <input type="date" id="fechaCobroVenta" class="w-full p-3 border rounded-xl" value="${new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0]}">
+                    <label class="block text-sm font-medium">🧾 Número de Factura</label>
+                    <input type="text" id="numFacturaVenta" class="w-full p-3 border rounded-xl" placeholder="Ej: 0001-00123456">
+                </div>
+                <div class="flex gap-3 mt-5">
+                    <button id="confirmarVentaBtn" class="flex-1 bg-green-600 hover:bg-green-700 text-white py-3 rounded-xl">✅ Crear Venta</button>
+                    <button id="cancelarVentaBtn" class="flex-1 bg-gray-300 dark:bg-gray-700 hover:bg-gray-400 py-3 rounded-xl">Cancelar</button>
+                </div>
+            </div>
+        </div>`;
+
+    document.getElementById('confirmarVentaBtn').onclick = () => {
+        const oc = document.getElementById('ocClienteVenta').value.trim();
+        const fechaCobro = document.getElementById('fechaCobroVenta').value;
+        const numFactura = document.getElementById('numFacturaVenta').value.trim();
+
+        if (!numFactura) {
+            mostrarNotificacion('Ingrese número de factura', 'warning');
+            return;
+        }
+
+        // Crear la venta (igual que en ventas.js)
+        const nuevaVenta = {
+            id: generarId(),
+            clienteId: presupuesto.clienteId,
+            clienteNombre: presupuesto.cliente,
+            tipoComprobante: 'Factura A',
+            numComprobante: numFactura,
+            montoNeto: presupuesto.ventaCliente || presupuesto.total / (1 + (presupuesto.incluirIVA ? 0.21 : 0)),
+            iva: presupuesto.incluirIVA ? 21 : 0,
+            ivaMonto: presupuesto.incluirIVA ? presupuesto.total * 0.21 / 1.21 : 0,
+            total: presupuesto.total,
+            fechaVenta: new Date().toISOString().split('T')[0],
+            fechaCobroEsperada: fechaCobro || new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
+            mes: new Date().toISOString().substring(0, 7),
+            estado: 'aceptado',
+            facturaUrl: null,
+            facturaNombre: null,
+            ordenCompraCliente: oc || null,
+            presupuestoId: presupuesto.id,
+            comprasVinculadas: presupuesto.items
+                .filter(i => i.compraVinculadaId)
+                .map(i => ({
+                    compraId: i.compraVinculadaId,
+                    itemIndex: i.compraItemIndex,
+                    cantidad: i.cantidadAsignada || i.cant,
+                    descripcion: i.desc
+                })),
+            compraVinculadaId: presupuesto.items.find(i => i.compraVinculadaId)?.compraVinculadaId || null,
+            compraItemIndex: presupuesto.items.find(i => i.compraVinculadaId)?.compraItemIndex || null,
+            cantidadAsignada: presupuesto.items.find(i => i.compraVinculadaId)?.cantidadAsignada || null,
+            medioPago: null,
+            comisionTarjeta: null,
+            interesMora: null,
+            fechaCobro: null,
+            comprobanteCobro: null,
+            items: presupuesto.items.map(i => ({ ...i }))
+        };
+
+        db.ventas.push(nuevaVenta);
+        const presupuestoIndex = db.presupuestos.findIndex(p => p.id === presupuestoId);
+        if (presupuestoIndex !== -1) {
+            db.presupuestos[presupuestoIndex].ventaGeneradaId = nuevaVenta.id;
+        }
+
+        guardarDB();
+        mostrarNotificacion(`✅ Venta creada desde presupuesto ${presupuesto.numero}`, 'success');
+        window.dispatchEvent(new Event('refreshView'));
+    };
+
+    document.getElementById('cancelarVentaBtn').onclick = () => window.dispatchEvent(new Event('refreshView'));
+};
+
+// ==================== FUNCIONES DE STOCK (delegadas a compras.js) ====================
+window.getStockDisponible = (compraId, itemIndex) => {
+    // Importar dinámicamente para evitar dependencia circular
+    return import('./compras.js').then(module => {
+        return module.getStockDisponible(compraId, itemIndex);
+    }).catch(() => 0);
+};
+
+window.reservarStock = (compraId, itemIndex, cantidad) => {
+    return import('./compras.js').then(module => {
+        return module.reservarStock(compraId, itemIndex, cantidad);
+    }).catch(() => false);
+};
+
+window.liberarStock = (compraId, itemIndex, cantidad) => {
+    return import('./compras.js').then(module => {
+        return module.liberarStock(compraId, itemIndex, cantidad);
+    }).catch(() => false);
+};
 
 export function initPresupuestosEvents() {}
