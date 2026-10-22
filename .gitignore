@@ -1,0 +1,22 @@
+# Backups
+*.bak
+*.bak-*
+*.bak.*
+*.old
+*.old.*
+
+# Firebase
+.firebase/
+firebase-debug.log
+
+# Node
+node_modules/
+
+# Sistema
+.DS_Store
+Thumbs.db
+
+# Backups de configuracion
+modules/configuracion-old/
+modules/configuracion_patch.js
+backups/
