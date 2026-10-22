@@ -1,40 +1,54 @@
 {
+    "id": "/",
     "name": "ERP Contable Argentina",
-    "short_name": "MiERP",
+    "short_name": "ERP Contable",
     "description": "Sistema de gestión administrativa con OCR y control de cobranzas",
     "start_url": "/",
+    "scope": "/",
     "display": "standalone",
     "theme_color": "#1e3a8a",
     "background_color": "#ffffff",
-    "orientation": "portrait",
+    "orientation": "any",
     "icons": [
         {
-            "src": "https://emojicdn.elk.sh/📊?size=192",
-            "sizes": "192x192",
+            "src": "/icons/icon-96.png",
+            "sizes": "96x96",
             "type": "image/png",
-            "purpose": "any maskable"
+            "purpose": "any"
         },
         {
-            "src": "https://emojicdn.elk.sh/📊?size=512",
+            "src": "/icons/icon-192.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "any"
+        },
+        {
+            "src": "/icons/icon-512.png",
             "sizes": "512x512",
             "type": "image/png",
-            "purpose": "any maskable"
+            "purpose": "any"
+        },
+        {
+            "src": "/icons/icon-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "maskable"
         }
     ],
     "shortcuts": [
         {
             "name": "Nuevo Presupuesto",
-            "short_name": "Escanear",
-            "description": "Escanear presupuesto con OCR",
-            "url": "/?action=scan",
-            "icons": [{ "src": "https://emojicdn.elk.sh/➕?size=96", "sizes": "96x96" }]
+            "short_name": "Nuevo Presu.",
+            "description": "Crear un nuevo presupuesto",
+            "url": "/?action=nuevo-presupuesto",
+            "icons": [{ "src": "/icons/icon-96.png", "sizes": "96x96", "type": "image/png" }]
         },
         {
             "name": "Dashboard",
             "short_name": "Inicio",
             "description": "Ver panel de control",
             "url": "/",
-            "icons": [{ "src": "https://emojicdn.elk.sh/📊?size=96", "sizes": "96x96" }]
+            "icons": [{ "src": "/icons/icon-96.png", "sizes": "96x96", "type": "image/png" }]
         }
     ]
 }

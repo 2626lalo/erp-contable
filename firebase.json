@@ -1,0 +1,33 @@
+{
+  "hosting": {
+    "public": ".",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**",
+      "**/__pycache__/**",
+      "**/*.log",
+      "**/*.tmp",
+      "**/*.swp",
+      "**/.git/**",
+      "**/.github/**",
+      "**/.vscode/**",
+      "**/.idea/**",
+      "**/dist/**",
+      "**/build/**",
+      "**/*.md",
+      "**/*.txt",
+      "**/*.sh",
+      "**/Dockerfile",
+      "**/docker-compose.yml",
+      "**/.dockerignore",
+      "**/.gcloudignore"
+    ],
+    "rewrites": [
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
+    ]
+  }
+}

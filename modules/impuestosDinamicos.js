@@ -21,6 +21,7 @@ const CONFIG_POR_DEFECTO = {
             activo: true,
             editable: true,
             esPredeterminado: true,
+            exentoHasta: null,  // 🔥 v7.16.94: fecha hasta la que está exento (null = no exento)
             descripcion: "Ingresos Brutos - Provincia de Salta"
         },
         tissh: {
@@ -31,6 +32,7 @@ const CONFIG_POR_DEFECTO = {
             activo: true,
             editable: true,
             esPredeterminado: true,
+            exentoHasta: null,  // 🔥 v7.16.94: fecha hasta la que está exento
             descripcion: "Tasa de Servicios Salta - Municipalidad"
         },
         impuestoCheque: {

@@ -1,114 +1,197 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="es-AR">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="MiERP">
+    <meta name="apple-mobile-web-app-title" content="ERP Contable">
     <meta name="theme-color" content="#1e3a8a">
-    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-    <meta http-equiv="Pragma" content="no-cache">
-    <meta http-equiv="Expires" content="0">
-    <link rel="manifest" href="/manifest.json">
-    <link rel="apple-touch-icon" href="https://emojicdn.elk.sh/📊?size=192">
-    <title>ERP Contable Argentina</title>
-    
-    <!-- Tailwind y librerías externas -->
+    <meta name="description" content="ERP Contable Argentina - Gestión integral para PYMES">
+    <title>📊 ERP Contable Argentina</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%231e3a8a' stroke-width='2'%3E%3Crect x='3' y='4' width='18' height='16' rx='2'/%3E%3Cline x1='8' y1='10' x2='16' y2='10'/%3E%3Cline x1='8' y1='14' x2='12' y2='14'/%3E%3C/svg%3E">
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/tesseract.js@5/dist/tesseract.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=7.0.0">
-    
-    <!-- OpenCV (para posible OCR avanzado) -->
-    <script async src="https://docs.opencv.org/4.8.0/opencv.js"></script>
     <script>
-        window.openCVReady = false;
-        window.onOpenCVReady = function() { window.openCVReady = true; console.log("✅ OpenCV.js cargado"); };
-        setTimeout(() => { if (!window.openCVReady) console.warn("⚠️ OpenCV.js timeout"); }, 10000);
-    </script>
-
-    <!-- Importmap para Firebase -->
-    <script type="importmap">
-    {
-        "imports": {
-            "firebase/app": "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js",
-            "firebase/firestore": "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js",
-            "firebase/storage": "https://www.gstatic.com/firebasejs/10.7.0/firebase-storage.js",
-            "firebase/auth": "https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js"
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        primary: {
+                            50: '#eff6ff',
+                            100: '#dbeafe',
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                            700: '#1d4ed8',
+                            800: '#1e40af',
+                            900: '#1e3a8a'
+                        }
+                    }
+                }
+            }
         }
-    }
     </script>
+    <!-- 🔥 v7.16.11: Librerías OCR (gratis, corren en el navegador) -->
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
+
+    <!-- 🔥 v7.16.12: Chart.js (gráficos del Dashboard y Tesorería) -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 
     <style>
-        * { -webkit-tap-highlight-color: transparent; }
-        .nav-container { position: fixed; bottom: 0; left: 0; right: 0; background: white; border-top: 1px solid #e5e7eb; box-shadow: 0 -2px 10px rgba(0,0,0,0.05); z-index: 50; }
-        .dark .nav-container { background: #1f2937; border-top-color: #374151; }
-        .nav-scroll { overflow-x: auto; overflow-y: hidden; white-space: nowrap; -webkit-overflow-scrolling: touch; scrollbar-width: thin; padding: 8px 0; }
-        .nav-scroll::-webkit-scrollbar { height: 3px; }
-        .nav-scroll::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 10px; }
-        .nav-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
-        .nav-btn { display: inline-flex; flex-direction: column; align-items: center; justify-content: center; padding: 8px 16px; min-width: 70px; background: transparent; border: none; cursor: pointer; transition: all 0.2s ease; border-radius: 12px; }
-        .nav-btn.active { color: #2563eb; background: #eff6ff; }
-        .dark .nav-btn.active { color: #3b82f6; background: #1e3a8a; }
-        .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 1rem; }
-        .modal-content { background: white; border-radius: 1rem; max-width: 500px; width: 100%; max-height: 90vh; overflow-y: auto; padding: 1.5rem; }
-        .dark .modal-content { background: #1f2937; }
-        .scroll-indicator { position: absolute; bottom: 55px; right: 10px; background: rgba(0,0,0,0.7); color: white; font-size: 10px; padding: 4px 10px; border-radius: 20px; pointer-events: none; z-index: 51; transition: opacity 0.5s; }
-        .scroll-indicator.hide { opacity: 0; }
-        .version-text { position: fixed; bottom: 5px; left: 0; right: 0; text-align: center; font-size: 9px; color: #9ca3af; background: transparent; pointer-events: none; z-index: 60; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body { height: 100%; overflow: hidden; font-family: system-ui, -apple-system, sans-serif; }
+        body { background: #f3f4f6; }
+        #app { height: 100%; display: flex; flex-direction: column; }
+        #root { flex: 1; overflow-y: auto; padding: 1rem; padding-top: 4.5rem; padding-bottom: 90px; }
+        .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 100; backdrop-filter: blur(4px); padding: 1rem; animation: fadeIn 0.2s ease; }
+        .modal-content { background: white; border-radius: 1.5rem; padding: 1.5rem; max-width: 100%; max-height: 90vh; overflow-y: auto; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25); width: 100%; }
+        .dark .modal-content { background: #1f2937; color: #e5e7eb; }
         .fade-in { animation: fadeIn 0.3s ease; }
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        .drag-handle { cursor: move; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .nav-btn { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.1rem; font-size: 0.7rem; padding: 0.4rem 0.3rem; border-radius: 0.75rem; transition: all 0.2s; min-width: 50px; color: #6b7280; background: transparent; border: none; cursor: pointer; }
+        .nav-btn.active { color: #2563eb; background: #eff6ff; }
+        .dark .nav-btn.active { color: #60a5fa; background: #1e3a8a; }
+        .nav-btn span:first-child { font-size: 1.5rem; }
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #a8a8a8; }
+        .dark ::-webkit-scrollbar-track { background: #374151; }
+        .dark ::-webkit-scrollbar-thumb { background: #6b7280; }
+        /* Notificaciones */
+        #notificacionesContador { min-width: 20px; min-height: 20px; line-height: 20px; font-size: 11px; }
     </style>
 </head>
-<body class="bg-gray-50 dark:bg-gray-900">
-    <div id="notificationContainer" class="fixed top-4 right-4 z-50 space-y-2"></div>
-    <div id="root" class="max-w-7xl mx-auto p-4 pb-28"></div>
-    <div class="version-text" id="versionText">Cargando...</div>
-    <button id="darkModeBtn" class="fixed bottom-28 right-4 bg-gray-800 dark:bg-gray-700 text-white p-3 rounded-full shadow-lg z-50 hover:scale-110 transition-transform">🌓</button>
-    
-    <div class="nav-container">
-        <div class="nav-scroll" id="navScroll">
-            <div style="display: inline-flex; min-width: 100%;">
-                <button data-view="dashboard" class="nav-btn"><span class="text-2xl">📊</span><span class="text-xs">Dashboard</span></button>
-                <button data-view="ventas" class="nav-btn"><span class="text-2xl">💰</span><span class="text-xs">Ventas</span></button>
-                <button data-view="compras" class="nav-btn"><span class="text-2xl">🛒</span><span class="text-xs">Compras</span></button>
-                <button data-view="presupuestos" class="nav-btn"><span class="text-2xl">📄</span><span class="text-xs">Presupuestos</span></button>
-                <button data-view="reportes" class="nav-btn"><span class="text-2xl">📅</span><span class="text-xs">Reportes</span></button>
-                <button data-view="contador" class="nav-btn"><span class="text-2xl">🧮</span><span class="text-xs">Contador</span></button>
-                <button data-view="calculador" class="nav-btn"><span class="text-2xl">📈</span><span class="text-xs">Ganancias</span></button>
-                <button data-view="gastosPersonales" class="nav-btn"><span class="text-2xl">💰</span><span class="text-xs">Gastos</span></button>
-                <button data-view="generadorInformes" class="nav-btn"><span class="text-2xl">🤖</span><span class="text-xs">Informes IA</span></button>
-                <button data-view="tesoreria" class="nav-btn"><span class="text-2xl">🏦</span><span class="text-xs">Tesorería</span></button>
-                <button data-view="configuracion" class="nav-btn"><span class="text-2xl">⚙️</span><span class="text-xs">Configuración</span></button>
+<body>
+    <div id="app" class="dark:bg-gray-900 dark:text-gray-100">
+        <!-- Banner de instalación PWA -->
+        <div id="installBanner" class="fixed top-0 left-0 right-0 z-50 bg-blue-600 text-white p-3 flex justify-between items-center shadow-lg transform -translate-y-full transition-transform duration-500">
+            <span class="text-sm font-medium">📱 Instalá la app en tu dispositivo</span>
+            <div class="flex gap-2">
+                <button id="installApp" class="bg-white text-blue-600 px-4 py-1 rounded-lg text-sm font-bold">Instalar</button>
+                <button id="closeBanner" class="text-white/80 hover:text-white text-xl">&times;</button>
             </div>
         </div>
-        <div id="scrollIndicator" class="scroll-indicator">← Desliza →</div>
-    </div>
 
-    <div id="installBanner" class="fixed top-0 left-0 right-0 bg-blue-600 text-white p-3 shadow-lg z-50 transform transition-transform duration-300 -translate-y-full">
-        <div class="flex justify-between items-center max-w-7xl mx-auto">
-            <div class="flex items-center gap-3"><span class="text-2xl">📊</span><div><p class="font-bold">Instalar ERP Contable</p><p class="text-xs text-blue-100">Usala como app nativa</p></div></div>
-            <div class="flex gap-2"><button id="installApp" class="bg-white text-blue-600 px-4 py-1 rounded font-semibold text-sm">Instalar</button><button id="closeBanner" class="text-white px-2 text-xl">✕</button></div>
+        <!-- Barra superior fija con fecha/hora y iconos -->
+        <div class="fixed top-0 left-0 right-0 z-40 bg-white dark:bg-gray-800 border-b dark:border-gray-700 px-2 sm:px-4 py-2 flex justify-between items-center shadow-sm">
+            <div class="flex items-center gap-2 flex-shrink-0">
+                <span class="text-2xl">📊</span>
+                <span class="font-bold text-gray-800 dark:text-white hidden sm:inline">ERP Contable</span>
+                <span id="empresaActivaBadge" class="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full hidden" title="Empresa activa"></span>
+            </div>
+
+            <!-- 🔥 v7.16.9: Fecha/Mes/Hora en la cabecera -->
+            <!-- Desktop: muestra todo -->
+            <div id="fechaHoraDesktop" class="hidden md:flex flex-col items-center flex-1 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg px-3 py-1 transition-colors" onclick="window.abrirModalFechaHora()" title="Click para ver más">
+                <div id="fechaHoraMes" class="text-sm font-bold text-gray-700 dark:text-gray-200">—</div>
+                <div id="fechaHoraDetalle" class="text-xs text-gray-500 dark:text-gray-400">—</div>
+            </div>
+            <!-- Móvil: solo mes, click para detalle -->
+            <div id="fechaHoraMobile" class="md:hidden flex flex-col items-center flex-1 cursor-pointer" onclick="window.abrirModalFechaHora()">
+                <div id="fechaHoraMesMobile" class="text-xs font-bold text-gray-700 dark:text-gray-200">—</div>
+            </div>
+
+            <div class="flex items-center gap-0.5 sm:gap-1 flex-shrink-0">
+                <button id="empresasBtn" onclick="window.showView('empresas')" class="p-1.5 sm:p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors hidden" title="Gestión de empresas (super-admin)">
+                    <span class="text-xl sm:text-2xl">🏢</span>
+                </button>
+                <button id="usuariosBtn" onclick="window.showView('usuarios')" class="p-1.5 sm:p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors hidden" title="Gestión de usuarios (super-admin)">
+                    <span class="text-xl sm:text-2xl">🎭</span>
+                </button>
+                <button id="notificacionesBtn" onclick="window.mostrarNotificacionesPopup()" class="relative p-1.5 sm:p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
+                    <span class="text-xl sm:text-2xl">🔔</span>
+                    <span id="notificacionesContador" class="absolute -top-1 -right-1 bg-red-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center hidden">0</span>
+                </button>
+                <button id="darkModeBtn" class="p-1.5 sm:p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
+                    <span class="text-xl sm:text-2xl">🌙</span>
+                </button>
+                <button id="cerrarSesionBtn" onclick="if(confirm('¿Cerrar sesión?')) window.cerrarSesion()" class="p-1.5 sm:p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors" title="Cerrar sesión">
+                    <span class="text-xl sm:text-2xl">🚪</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Contenedor principal -->
+        <div id="root" class="pb-24"></div>
+
+        <!-- Barra de navegación inferior -->
+        <div class="fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-800 border-t dark:border-gray-700 flex justify-around items-center px-1 py-1 shadow-lg z-40">
+            <button data-view="dashboard" class="nav-btn active"><span>📊</span><span>Dashboard</span></button>
+            <button data-view="ventas" class="nav-btn"><span>💰</span><span>Ventas</span></button>
+            <button data-view="compras" class="nav-btn"><span>🛒</span><span>Compras</span></button>
+            <button data-view="presupuestos" class="nav-btn"><span>📄</span><span>Presup.</span></button>
+            <button data-view="unidades" class="nav-btn"><span>🚗</span><span>Unidades</span></button>
+            <button data-view="contador" class="nav-btn"><span>🧮</span><span>Contador</span></button>
+            <button data-view="reportes" class="nav-btn"><span>📄</span><span>Reportes</span></button>
+            <button data-view="tesoreria" class="nav-btn"><span>🏦</span><span>Tesor.</span></button>
+            <button data-view="configuracion" class="nav-btn"><span>⚙️</span><span>Config.</span></button>
         </div>
     </div>
 
-    <!-- Script principal con import map -->
-    <script type="module" src="app.js?v=7.0.0"></script>
+            <!-- 🔥 Auto-actualización del Service Worker (v7.16.34 - MANUAL) -->
     <script>
-        const VERSION = '7.0.0';
-        setTimeout(() => { const versionEl = document.getElementById('versionText'); if (versionEl) versionEl.innerText = `📱 ERP Contable v${VERSION}`; }, 500);
-        setTimeout(() => { const indicator = document.getElementById('scrollIndicator'); if (indicator) indicator.classList.add('hide'); }, 4000);
-        const navScroll = document.getElementById('navScroll');
-        if (navScroll) { navScroll.addEventListener('scroll', () => { const indicator = document.getElementById('scrollIndicator'); if (indicator) indicator.classList.add('hide'); }); }
-        
-        if (window.location.search.includes('_refresh')) {
-            localStorage.setItem('app_version', VERSION);
-            history.replaceState({}, document.title, window.location.pathname);
+    (function() {
+        if (!('serviceWorker' in navigator)) return;
+
+        let recargando = false;
+
+        // Cuando el SW nuevo toma control, NO recargar automáticamente.
+        // En su lugar, mostrar un banner pidiendo al usuario que recargue manualmente.
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+            console.log('[App] SW nuevo activo. Usá Ctrl+Shift+R para recargar.');
+        });
+
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('sw.js').then(reg => {
+                console.log('[App] SW registrado. Scope:', reg.scope);
+
+                reg.addEventListener('updatefound', () => {
+                    const newWorker = reg.installing;
+                    if (!newWorker) return;
+                    newWorker.addEventListener('statechange', () => {
+                        if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                            console.log('[App] Nueva versión lista. Activando...');
+                            newWorker.postMessage({ type: 'SKIP_WAITING' });
+                            mostrarBannerActualizacion();
+                        }
+                    });
+                });
+            }).catch(err => {
+                console.warn('[App] Error registrando SW:', err);
+            });
+        });
+
+        function mostrarBannerActualizacion() {
+            // Si ya hay un banner, no crear otro
+            if (document.getElementById('bannerActualizacion')) return;
+
+            const banner = document.createElement('div');
+            banner.id = 'bannerActualizacion';
+            banner.style.cssText = 'position:fixed;bottom:100px;left:50%;transform:translateX(-50%);z-index:9999;background:#1e40af;color:white;padding:12px 20px;border-radius:12px;box-shadow:0 10px 25px rgba(0,0,0,0.3);font-family:system-ui;display:flex;align-items:center;gap:12px;';
+            banner.innerHTML = `
+                <span style="font-size:1.2rem;">🔄</span>
+                <span style="font-size:0.9rem;">Hay una actualización disponible</span>
+                <button id="btnRecargarApp" style="background:white;color:#1e40af;border:none;padding:6px 14px;border-radius:8px;font-weight:bold;cursor:pointer;font-size:0.9rem;">Actualizar</button>
+                <button id="btnCerrarBanner" style="background:transparent;color:white;border:none;font-size:1.2rem;cursor:pointer;padding:0 4px;">&times;</button>
+            `;
+            document.body.appendChild(banner);
+
+            document.getElementById('btnRecargarApp').onclick = () => {
+                window.location.reload();
+            };
+            document.getElementById('btnCerrarBanner').onclick = () => {
+                banner.remove();
+            };
         }
+    })();
     </script>
+
+    <!-- Script principal -->
+    <script type="module" src="app.js?v=7.21.6"></script>
 </body>
 </html>
