@@ -620,3 +620,8 @@ export function iniciarFechaHora() {
     actualizarFechaHora();
     setInterval(actualizarFechaHora, 60000); // cada 60 segundos
 }
+
+
+// --- Fix vista previa y eliminar factura ---
+
+

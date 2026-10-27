@@ -3,7 +3,7 @@
 // ERP Contable Argentina - v7.0.0
 
 import { getDB, guardarDB, getTodosLosImpuestos } from '../db.js';
-import { formatNumber, escapeHtml, formatDate, mostrarNotificacion, generarId, validarDatosEsenciales, mostrarAlertaDatosFaltantes } from '../utils.js';
+import { formatNumber, escapeHtml, formatDate, mostrarNotificacion, generarId, validarDatosEsenciales, mostrarAlertaDatosFaltantes, confirmarAccion} from '../utils.js';
 import { ALICUOTA_IVA } from './estado.js';
 import {
     crearModal, cerrarModal, getProximoNumeroPresupuesto, procesarTextoItem, getVigenciaTexto,
@@ -16,6 +16,19 @@ import { renderizarTablaItems, renderizarComparativas, redondearEntero } from '.
 import { generarHTMLPresupuestoCliente } from './plantilla-cliente.js';
 import { generarHTMLPresupuestoCompleto } from './plantilla-completa.js';
 import { buscarUnidadPorPatente, autocompletarDesdePatente, crearOActualizarUnidad } from '../unidades.js';
+
+// ==================== 🔥 v7.22.15: ACTUALIZAR VIGENCIA (AL PRINCIPIO) ====================
+window.actualizarVigenciaPresupuesto = () => {
+    const fechaEmision = document.getElementById('fechaEmisionPresupuesto')?.value;
+    const dias = parseInt(document.getElementById('validezDias')?.value) || 20;
+    const vigenciaInput = document.getElementById('vigencia');
+    if (vigenciaInput && fechaEmision) {
+        const fecha = new Date(fechaEmision + 'T12:00:00');
+        fecha.setDate(fecha.getDate() + dias);
+        vigenciaInput.value = `Este presupuesto tiene validez hasta el ${fecha.toLocaleDateString('es-AR')}`;
+    }
+};
+
 
 // Referencias al estado (se sincronizan vía setters)
 let itemsPresupuesto = [];
@@ -135,6 +148,7 @@ window.editarPresupuesto = (id) => {
 
 // ==================== EDITOR PRINCIPAL ====================
 function mostrarEditorPresupuesto(padreId, datosEditar = null) {
+    window._datosEditarActuales = datosEditar;
     const db = getDB();
     const esEdicion = !!datosEditar;
     const clienteIdSeleccionado = datosEditar ? datosEditar.clienteId : null;
@@ -185,6 +199,14 @@ function mostrarEditorPresupuesto(padreId, datosEditar = null) {
                         <div><label class="block font-medium mb-1">Compañía de Seguros</label><input type="text" id="companiaSeguros" class="w-full p-2 border rounded-lg" value="${datosEditar ? escapeHtml(datosEditar.companiaSeguros || 'NO APLICA') : 'NO APLICA'}"></div>
                         <div><label class="block font-medium mb-1">Nro. Siniestro</label><input type="text" id="nroSiniestro" class="w-full p-2 border rounded-lg" value="${datosEditar ? escapeHtml(datosEditar.nroSiniestro || '') : ''}" placeholder="Opcional"></div>
                         <div><label class="block font-medium mb-1">Vigencia</label><input type="text" id="vigencia" value="${getVigenciaTexto()}" class="w-full p-2 border rounded-lg bg-gray-100" readonly></div>
+                        <div>
+                            <label class="block font-medium mb-1">📅 Fecha de emisión</label>
+                            <div class="flex items-center gap-2">
+                                <input type="text" id="fechaEmisionPresupuestoText" class="flex-1 p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600" placeholder="DD/MM/AAAA" value="${datosEditar && datosEditar.fechaCreacion ? formatDate(datosEditar.fechaCreacion) : formatDate(new Date())}" oninput="const p=this.value.split('/');if(p.length===3){const h=document.getElementById('fechaEmisionPresupuesto');if(h){h.value=p[2]+'-'+p[1]+'-'+p[0];window.actualizarVigenciaPresupuesto();}}">
+                                <input type="date" id="fechaEmisionPresupuesto" class="hidden" value="${datosEditar && datosEditar.fechaCreacion ? datosEditar.fechaCreacion.split('T')[0] : new Date().toISOString().split('T')[0]}">
+                                <button type="button" id="btnCalendarioEmisionPresupuesto" class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded-lg text-sm">📅</button>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- 🔥 v7.18.0: Campos nuevos del presupuesto -->
@@ -195,11 +217,26 @@ function mostrarEditorPresupuesto(padreId, datosEditar = null) {
                         </div>
                         <div>
                             <label class="block font-medium mb-1">📅 Válido por (días)</label>
-                            <input type="number" id="validezDias" class="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600" value="${datosEditar ? (datosEditar.validezDias || 20) : 20}" min="1" max="365">
+                            <input type="number" id="validezDias" class="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600" value="${datosEditar ? (datosEditar.validezDias || 20) : 20}" min="1" max="365" oninput="window.actualizarVigenciaPresupuesto()">
                         </div>
                         <div class="md:col-span-3">
                             <label class="block font-medium mb-1">📋 Condiciones</label>
                             <textarea id="condicionesPresupuesto" rows="2" class="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-sm" placeholder="Ej: Precios sujetos a variación. El presupuesto se basa en inspección inicial...">${datosEditar ? escapeHtml(datosEditar.condiciones || '') : 'Precios sujetos a variación. El presupuesto se basa en inspección inicial; al desarmar pueden surgir tareas o repuestos adicionales que requerirán aprobación. No válido para reclamos judiciales.'}</textarea>
+                        </div>
+                        <div class="md:col-span-3">
+                            <label class="block font-medium mb-1">📎 Presupuesto de referencia (opcional)</label>
+                            <p class="text-xs text-gray-500 mb-1">Subí el PDF o imagen del presupuesto original del taller/proveedor. Queda guardado junto al registro.</p>
+                            <div class="flex gap-2 mb-2">
+                                <input type="text" id="presupuestoReferenciaNumero" placeholder="Nº de presupuesto del taller (ej: T2601-0263)" class="flex-1 p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-sm" value="${datosEditar && datosEditar.presupuestoReferenciaNumero ? escapeHtml(datosEditar.presupuestoReferenciaNumero) : ''}">
+                            </div>
+                            <input type="file" id="presupuestoReferenciaInput" accept="image/*,.pdf" class="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-sm" onchange="window.subirPresupuestoReferencia(this.files[0])">
+                            <div id="presupuestoReferenciaInfo" class="mt-2 ${datosEditar && datosEditar.presupuestoReferenciaUrl ? '' : 'hidden'}">
+                                <div class="flex items-center gap-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                                    <span class="text-xs text-blue-600 flex-1" id="presupuestoReferenciaNombre">${datosEditar && datosEditar.presupuestoReferenciaNombre ? escapeHtml(datosEditar.presupuestoReferenciaNombre) : 'archivo'}</span>
+                                    <button type="button" onclick="window.verPresupuestoReferencia()" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-xs">👁️ Ver</button>
+                                    <button type="button" onclick="window.quitarPresupuestoReferencia()" class="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-xs">🗑️ Quitar</button>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
@@ -789,7 +826,7 @@ function inicializarEventosEditor(ctx) {
             valorHora: 0,
             precioVentaUnitario: 0,
             esPropio: false,
-            accion: ''
+            accion: 'REP - Repuesto'
         };
         ctx.items.push(nuevoItem);
         renderizarTodo(ctx);
@@ -812,7 +849,7 @@ function inicializarEventosEditor(ctx) {
             valorHora: valorHoraSugerido,
             precioVentaUnitario: 0,
             esPropio: false,
-            accion: ''
+            accion: 'MO - Mano de Obra'
         };
         nuevoItem.costo = nuevoItem.horas * nuevoItem.valorHora;
         nuevoItem.precioVentaUnitario = nuevoItem.costo * (1 + ctx.markup / 100);
@@ -967,7 +1004,9 @@ function inicializarEventosEditor(ctx) {
         if (!cliente && !clienteManual) { mostrarNotificacion('Seleccione un cliente o cargue uno manual', 'warning'); return; }
         const snapshot = {
             numero: ctx.numeroPresupuesto,
-            fechaCreacion: ctx.esEdicion ? ctx.datosEditar.fechaCreacion : new Date().toISOString(),
+            fechaCreacion: document.getElementById('fechaEmisionPresupuesto')?.value 
+                ? new Date(document.getElementById('fechaEmisionPresupuesto').value + 'T12:00:00').toISOString()
+                : (ctx.esEdicion ? ctx.datosEditar.fechaCreacion : new Date().toISOString()),
             clienteId: cliente ? cliente.id : null,
             cliente: clienteManual || (cliente ? cliente.nombre : ''),
             clienteManual: clienteManual,
@@ -985,7 +1024,7 @@ function inicializarEventosEditor(ctx) {
             comentarios: document.getElementById('comentarios').value,
             items: ctx.items.map(i => ({ ...i })),
             usarMarkupGlobal: ctx.usarGlobal,
-            markupGlobal: ctx.markup,
+            markupGlobal: parseInt(document.getElementById('markupSlider')?.value) || ctx.markup,
             incluirIVA: ctx.iva
         };
         const html = generarHTMLPresupuestoCliente(snapshot);
@@ -1002,7 +1041,9 @@ function inicializarEventosEditor(ctx) {
         if (!cliente && !clienteManual) { mostrarNotificacion('Seleccione un cliente o cargue uno manual', 'warning'); return; }
         const snapshot = {
             numero: ctx.numeroPresupuesto,
-            fechaCreacion: ctx.esEdicion ? ctx.datosEditar.fechaCreacion : new Date().toISOString(),
+            fechaCreacion: document.getElementById('fechaEmisionPresupuesto')?.value 
+                ? new Date(document.getElementById('fechaEmisionPresupuesto').value + 'T12:00:00').toISOString()
+                : (ctx.esEdicion ? ctx.datosEditar.fechaCreacion : new Date().toISOString()),
             clienteId: cliente ? cliente.id : null,
             cliente: clienteManual || (cliente ? cliente.nombre : ''),
             clienteManual: clienteManual,
@@ -1022,7 +1063,11 @@ function inicializarEventosEditor(ctx) {
             items: ctx.items.map(i => ({ ...i })),
             usarMarkupGlobal: ctx.usarGlobal,
             markupGlobal: ctx.markup,
-            incluirIVA: ctx.iva
+            incluirIVA: ctx.iva,
+            trabajo: document.getElementById('trabajoPresupuesto')?.value.trim() || '',
+            presupuestoReferenciaNumero: document.getElementById('presupuestoReferenciaNumero')?.value.trim() || '',
+            validezDias: parseInt(document.getElementById('validezDias')?.value) || 20,
+            condiciones: document.getElementById('condicionesPresupuesto')?.value.trim() || ''
         };
         const html = generarHTMLPresupuestoCompleto(snapshot);
         const ventana = window.open('', '_blank', 'width=900,height=700');
@@ -1032,6 +1077,16 @@ function inicializarEventosEditor(ctx) {
 
     // Guardar presupuesto
     document.getElementById('guardarPresupuesto').onclick = () => {
+        // 🔥 v7.22.8: sincronizar fecha del input de texto al hidden ANTES de guardar
+        const fechaTextoGuardar = document.getElementById('fechaEmisionPresupuestoText')?.value;
+        const fechaHiddenGuardar = document.getElementById('fechaEmisionPresupuesto');
+        if (fechaTextoGuardar && fechaHiddenGuardar) {
+            const partes = fechaTextoGuardar.split('/');
+            if (partes.length === 3 && partes[0] && partes[1] && partes[2]) {
+                fechaHiddenGuardar.value = `${partes[2]}-${partes[1]}-${partes[0]}`;
+            }
+        }
+        
         const clienteId = parseInt(document.getElementById('clienteSelect').value);
         const cliente = db.clientes.find(c => c.id === clienteId);
         const clienteManual = document.getElementById('clienteManual').value.trim();
@@ -1060,11 +1115,18 @@ function inicializarEventosEditor(ctx) {
             interesadoTel: document.getElementById('interesadoTel').value,
             companiaSeguros: (document.getElementById('companiaSeguros').value || '').toUpperCase(),
             nroSiniestro: document.getElementById('nroSiniestro').value,
+            // 🔥 v7.22.11: fechaCreacion usando el hidden sincronizado
+            fechaCreacion: document.getElementById('fechaEmisionPresupuesto')?.value 
+                ? new Date(document.getElementById('fechaEmisionPresupuesto').value + 'T12:00:00').toISOString()
+                : (ctx.esEdicion ? ctx.datosEditar.fechaCreacion : new Date().toISOString()),
             vigencia: document.getElementById('vigencia').value,
             // 🔥 v7.18.6: campos nuevos
             trabajo: (document.getElementById('trabajoPresupuesto')?.value || '').toUpperCase(),
             validezDias: parseInt(document.getElementById('validezDias')?.value) || 20,
             condiciones: document.getElementById('condicionesPresupuesto')?.value || '',
+            // 🔥 v7.21.7: presupuesto de referencia
+            presupuestoReferenciaUrl: window._presupuestoReferenciaUrl !== undefined ? window._presupuestoReferenciaUrl : (ctx.esEdicion ? ctx.datosEditar.presupuestoReferenciaUrl || null : null),
+            presupuestoReferenciaNombre: window._presupuestoReferenciaNombre !== undefined ? window._presupuestoReferenciaNombre : (ctx.esEdicion ? ctx.datosEditar.presupuestoReferenciaNombre || null : null),
             comentarios: document.getElementById('comentarios').value,
             items: ctx.items.map(i => ({ ...i })),
             usarMarkupGlobal: ctx.usarGlobal,
@@ -1082,7 +1144,10 @@ function inicializarEventosEditor(ctx) {
             ivaAPagar: gn.ivaAPagar,
             iva: ctx.iva ? gn.ivaVentas : 0,
             total: ctx.iva ? ventaTotal : gn.ventaNeta,
-            fechaCreacion: ctx.esEdicion ? ctx.datosEditar.fechaCreacion : new Date().toISOString(),
+            // 🔥 v7.22.12: usar el hidden sincronizado (no la fecha original)
+            fechaCreacion: document.getElementById('fechaEmisionPresupuesto')?.value 
+                ? new Date(document.getElementById('fechaEmisionPresupuesto').value + 'T12:00:00').toISOString()
+                : (ctx.esEdicion ? ctx.datosEditar.fechaCreacion : new Date().toISOString()),
             presupuestoPadreId: presupuestoPadreId,
             estado: ctx.esEdicion ? (ctx.datosEditar.estado || 'pendiente') : 'pendiente',
             ventaGeneradaId: ctx.esEdicion ? ctx.datosEditar.ventaGeneradaId || null : null,
@@ -1120,3 +1185,148 @@ function inicializarEventosEditor(ctx) {
         window.dispatchEvent(new Event('refreshView'));
     };
 }
+
+// ==================== 🔥 v7.22.1: FUNCIONES DE PRESUPUESTO DE REFERENCIA ====================
+
+// Subir archivo a Storage
+window.subirPresupuestoReferencia = async (file) => {
+    if (!file) return;
+    try {
+        const { subirArchivo, comprimirImagen, getEmpresaActual } = await import('../firebase.js');
+        const fileComprimido = await comprimirImagen(file);
+        const ext = (fileComprimido.name.split('.').pop() || 'bin').toLowerCase();
+        const empresaId = getEmpresaActual() || 'empresa_principal';
+        const timestamp = Date.now();
+        const ruta = `${empresaId}/presupuestos/referencia_${timestamp}.${ext}`;
+        const url = await subirArchivo(ruta, fileComprimido);
+        window._presupuestoReferenciaUrl = url;
+        window._presupuestoReferenciaNombre = fileComprimido.name;
+        const info = document.getElementById('presupuestoReferenciaInfo');
+        if (info) {
+            info.classList.remove('hidden');
+            const nombreSpan = document.getElementById('presupuestoReferenciaNombre');
+            if (nombreSpan) nombreSpan.textContent = fileComprimido.name;
+        }
+        mostrarNotificacion('✅ Presupuesto de referencia subido', 'success');
+    } catch (e) {
+        console.error('Error subiendo presupuesto de referencia:', e);
+        mostrarNotificacion('Error subiendo archivo: ' + e.message, 'error');
+    }
+};
+
+// Ver presupuesto de referencia en modal
+window.verPresupuestoReferencia = () => {
+    const url = window._presupuestoReferenciaUrl || (window._datosEditarActuales && window._datosEditarActuales.presupuestoReferenciaUrl);
+    if (!url) {
+        mostrarNotificacion('No hay archivo para ver', 'warning');
+        return;
+    }
+    const mostrarModal = (urlFinal) => {
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.style.zIndex = '9999';
+        modal.innerHTML = `
+            <div class="modal-content w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+                <h2 class="text-xl font-bold mb-3 text-center">👁️ Presupuesto de referencia</h2>
+                <div class="bg-gray-100 dark:bg-gray-900 rounded-lg p-2 text-center" style="min-height:60vh;">
+                    ${urlFinal.includes('.pdf') || urlFinal.startsWith('data:application/pdf')
+                        ? `<iframe src="${urlFinal}" style="width:100%;height:70vh;border:none;"></iframe>`
+                        : `<img src="${urlFinal}" style="max-width:100%;max-height:70vh;object-fit:contain;">`
+                    }
+                </div>
+                <button onclick="this.closest('.modal').remove();" class="mt-3 w-full bg-gray-300 dark:bg-gray-600 py-2 rounded-xl">Cerrar</button>
+            </div>
+        `;
+        document.body.appendChild(modal);
+    };
+    if (url.startsWith('data:')) {
+        try {
+            const partes = url.split(',');
+            const mime = partes[0].match(/:(.*?);/)[1];
+            const binario = atob(partes[1]);
+            const bytes = new Uint8Array(binario.length);
+            for (let i = 0; i < binario.length; i++) bytes[i] = binario.charCodeAt(i);
+            const blob = new Blob([bytes], { type: mime });
+            const blobUrl = URL.createObjectURL(blob);
+            mostrarModal(blobUrl);
+        } catch (e) {
+            console.error('Error procesando dataURL:', e);
+            mostrarModal(url);
+        }
+    } else {
+        mostrarModal(url);
+    }
+};
+
+// Quitar presupuesto de referencia
+window.quitarPresupuestoReferencia = async () => {
+    const confirmado = await confirmarAccion({
+        titulo: '🗑️ Quitar presupuesto de referencia',
+        mensaje: '¿Estás seguro de quitar el presupuesto de referencia adjunto?',
+        textoConfirmar: '🗑️ Sí, quitar',
+        icono: '📎'
+    });
+    if (!confirmado) return;
+    // 🔥 v7.24.10: Limpiar TODOS los campos relacionados
+    window._presupuestoReferenciaUrl = null;
+    window._presupuestoReferenciaNombre = null;
+    window._presupuestoReferenciaNumero = null;
+    const info = document.getElementById('presupuestoReferenciaInfo');
+    if (info) info.classList.add('hidden');
+    const input = document.getElementById('presupuestoReferenciaInput');
+    if (input) input.value = '';
+    const inputNumero = document.getElementById('presupuestoReferenciaNumero');
+    if (inputNumero) inputNumero.value = '';
+    mostrarNotificacion('🗑️ Presupuesto de referencia quitado', 'info');
+};
+
+// ==================== 🔥 v7.22.7: EVENTO DEL CALENDARIO DE FECHA DE EMISIÓN ====================
+// Este bloque se ejecuta después de que el editor se renderiza
+document.addEventListener('DOMContentLoaded', () => {
+    const btnCalendarioEmisionPresupuesto = document.getElementById('btnCalendarioEmisionPresupuesto');
+    const fechaEmisionPresupuestoText = document.getElementById('fechaEmisionPresupuestoText');
+    const fechaEmisionPresupuestoHidden = document.getElementById('fechaEmisionPresupuesto');
+    
+    if (btnCalendarioEmisionPresupuesto && fechaEmisionPresupuestoHidden) {
+        btnCalendarioEmisionPresupuesto.addEventListener('click', () => {
+            fechaEmisionPresupuestoHidden.showPicker();
+        });
+        fechaEmisionPresupuestoHidden.addEventListener('change', () => {
+            if (fechaEmisionPresupuestoHidden.value) {
+                const [a, m, d] = fechaEmisionPresupuestoHidden.value.split('-');
+                if (fechaEmisionPresupuestoText) fechaEmisionPresupuestoText.value = `${d}/${m}/${a}`;
+            }
+        });
+    }
+});
+
+// También lo ejecutamos cada vez que se abre el editor (por si el DOMContentLoaded ya pasó)
+window.initCalendarioEmisionPresupuesto = () => {
+    const btnCalendarioEmisionPresupuesto = document.getElementById('btnCalendarioEmisionPresupuesto');
+    const fechaEmisionPresupuestoText = document.getElementById('fechaEmisionPresupuestoText');
+    const fechaEmisionPresupuestoHidden = document.getElementById('fechaEmisionPresupuesto');
+    
+    if (btnCalendarioEmisionPresupuesto && fechaEmisionPresupuestoHidden) {
+        btnCalendarioEmisionPresupuesto.addEventListener('click', () => {
+            fechaEmisionPresupuestoHidden.showPicker();
+        });
+        fechaEmisionPresupuestoHidden.addEventListener('change', () => {
+            if (fechaEmisionPresupuestoHidden.value) {
+                const [a, m, d] = fechaEmisionPresupuestoHidden.value.split('-');
+                if (fechaEmisionPresupuestoText) fechaEmisionPresupuestoText.value = `${d}/${m}/${a}`;
+            }
+        });
+    }
+};
+
+// ==================== 🔥 v7.22.9: SINCRONIZAR FECHA DE EMISIÓN ====================
+window.sincronizarFechaEmisionPresupuesto = (fechaTexto) => {
+    if (!fechaTexto) return;
+    const partes = fechaTexto.split('/');
+    if (partes.length === 3 && partes[0] && partes[1] && partes[2]) {
+        const hidden = document.getElementById('fechaEmisionPresupuesto');
+        if (hidden) {
+            hidden.value = `${partes[2]}-${partes[1]}-${partes[0]}`;
+        }
+    }
+};

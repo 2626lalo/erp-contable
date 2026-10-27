@@ -21,13 +21,29 @@ export function calcularDiasRestantes(fecha) {
 
 export function formatDate(fecha) {
     if (!fecha) return '';
-    const d = new Date(fecha);
+    // 🔥 v7.22.33: si es string 'YYYY-MM-DD', parsear como LOCAL (no UTC) para evitar bug UTC-3
+    let d;
+    if (typeof fecha === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(fecha)) {
+        const [a, m, dia] = fecha.split('-').map(Number);
+        d = new Date(a, m - 1, dia);
+    } else {
+        d = new Date(fecha);
+    }
+    if (isNaN(d)) return '';
     return `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth()+1).toString().padStart(2, '0')}/${d.getFullYear()}`;
 }
 
 export function formatDateISO(fecha) {
     if (!fecha) return '';
-    const d = new Date(fecha);
+    // 🔥 v7.22.33: si es string 'YYYY-MM-DD', parsear como LOCAL (no UTC)
+    let d;
+    if (typeof fecha === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(fecha)) {
+        const [a, m, dia] = fecha.split('-').map(Number);
+        d = new Date(a, m - 1, dia);
+    } else {
+        d = new Date(fecha);
+    }
+    if (isNaN(d)) return '';
     return `${d.getFullYear()}-${(d.getMonth()+1).toString().padStart(2, '0')}-${d.getDate().toString().padStart(2, '0')}`;
 }
 

@@ -5,8 +5,7 @@
 import { getDB, guardarDB } from '../db.js';
 import {
     formatNumber, mostrarNotificacion, escapeHtml, formatDate, generarId,
-    calcularSaldoProveedor, obtenerComprasPendientesProveedor, obtenerTotalComprasProveedor
-} from '../utils.js';
+    calcularSaldoProveedor, obtenerComprasPendientesProveedor, obtenerTotalComprasProveedor, confirmarAccion} from '../utils.js';
 import {
     crearModal,
     cerrarModal,
@@ -214,8 +213,8 @@ window.editarProveedor = (id) => {
 };
 
 // ==================== ELIMINAR ====================
-window.eliminarProveedor = (id) => {
-    if (!confirm('¿Eliminar este proveedor? No se podrá recuperar.')) return;
+window.eliminarProveedor = async (id) => {
+    if (!(await confirmarAccion({ titulo: '🗑️ Eliminar proveedor', mensaje: '¿Eliminar este proveedor? No se podrá recuperar.', textoConfirmar: '🗑️ Sí, eliminar', icono: '🏢' }))) return;
     const db = getDB();
     db.proveedores = db.proveedores.filter(p => p.id !== id);
     guardarDB();

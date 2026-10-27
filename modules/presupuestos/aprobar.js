@@ -20,7 +20,10 @@ window.aprobarPresupuesto = (id) => {
     // 🔥 v7.16.81: hoyISO viene de utils.js (helper local, sin bug UTC-3)
     const hoyFormateada = formatDate(new Date());
     const cliente = db.clientes.find(c => c.id === presupuesto.clienteId);
-    const diasCobro = cliente ? cliente.diasCobro : 30;
+    // 🔥 v7.22.29: forzar diasCobro a mínimo 0 y máximo 365
+    let diasCobro = cliente && cliente.diasCobro !== undefined && cliente.diasCobro !== null ? parseInt(cliente.diasCobro) : 30;
+    if (isNaN(diasCobro) || diasCobro < 0) diasCobro = 30;
+    if (diasCobro > 365) diasCobro = 365;
     const fechaCobroISO = new Date();
     fechaCobroISO.setDate(fechaCobroISO.getDate() + diasCobro);
     const fechaCobroFormateada = formatDate(fechaCobroISO);
@@ -35,15 +38,21 @@ window.aprobarPresupuesto = (id) => {
                     <p><strong>Total:</strong> <span class="font-bold text-green-600">$${formatNumber(presupuesto.total)}</span></p>
                 </div>
                 <div class="space-y-3">
-                    <label class="block text-sm font-medium">📋 Número de Orden de Compra (OC)</label>
-                    <input type="text" id="ocClienteAprob" class="w-full p-3 border rounded-xl" placeholder="Ej: OC-2026-001">
-                    <label class="block text-sm font-medium">📎 Adjuntar OC (PDF/Imagen)</label>
-                    <div class="flex items-center gap-2">
+                    <label class="block text-sm font-medium">📋 Número de Orden de Compra (OC) <span class="text-xs text-gray-400 font-normal">(opcional)</span></label>
+                    <input type="text" id="ocClienteAprob" class="w-full p-3 border rounded-xl" placeholder="Ej: OC-2026-001 (dejar vacío si es pago directo)">
+                    <label class="block text-sm font-medium">📎 Adjuntar OC (PDF/Imagen) <span class="text-xs text-gray-400 font-normal">(opcional)</span></label>
+                    <div class="flex items-center gap-2 flex-wrap">
                         <label class="cursor-pointer bg-gray-200 dark:bg-gray-700 px-4 py-2 rounded-lg text-sm hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors">
                             Seleccionar archivo
-                            <input type="file" id="ocArchivoAprob" accept=".pdf,image/*" class="hidden" onchange="window.actualizarNombreArchivo(this, 'nombreArchivoOC')">
+                            <input type="file" id="ocArchivoAprob" accept=".pdf,image/*" class="hidden" onchange="window.seleccionarOCClienteAprob(this.files[0])">
                         </label>
                         <span id="nombreArchivoOC" class="text-sm text-gray-500">Ningún archivo seleccionado</span>
+                    </div>
+                    <div id="ocClientePreviewActions" class="hidden mt-2 p-2 bg-white dark:bg-gray-800 rounded border dark:border-gray-700">
+                        <div class="flex flex-wrap gap-2">
+                            <button type="button" onclick="window.verOCClienteAprob()" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-xs">👁️ Ver vista previa</button>
+                            <button type="button" onclick="window.quitarOCClienteAprob()" class="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-xs">🗑️ Quitar</button>
+                        </div>
                     </div>
                     <label class="block text-sm font-medium">📅 Fecha de recepción de OC</label>
                     <div class="flex items-center gap-2">
@@ -109,7 +118,7 @@ window.aprobarPresupuesto = (id) => {
         const observaciones = document.getElementById('observacionesAprob').value.trim();
         const archivoOC = document.getElementById('ocArchivoAprob').files[0];
 
-        if (!oc) { mostrarNotificacion('Ingrese número de OC', 'warning'); return; }
+        // 🔥 v7.22.24: el número de OC es opcional (pagos directos sin OC)
         if (!fechaCobro) { mostrarNotificacion('Fecha de cobro esperada requerida', 'warning'); return; }
 
         const ventaNeta = presupuesto.ventaCliente !== undefined 
@@ -123,6 +132,9 @@ window.aprobarPresupuesto = (id) => {
             id: generarId(),
             clienteId: presupuesto.clienteId,
             clienteNombre: presupuesto.cliente,
+            patente: presupuesto.patente || '',
+            vehiculoMarca: presupuesto.vehiculoMarca || '',
+            vehiculoKm: presupuesto.vehiculoKm || '',
             tipoComprobante: 'Factura A',
             numComprobante: numFactura || null,
             montoNeto: ventaNeta,
@@ -130,6 +142,7 @@ window.aprobarPresupuesto = (id) => {
             ivaMonto: ivaMontoVenta,
             total: presupuesto.total,
             fechaVenta: hoyISO(),
+            fechaAprobacion: hoyISO(),  // 🔥 v7.22.20: fecha de aprobación
             fechaCobroEsperada: fechaCobro,
             mes: hoyISO().substring(0, 7),
             estado: numFactura ? 'pendiente_cobro' : 'pendiente_factura',
@@ -163,19 +176,30 @@ window.aprobarPresupuesto = (id) => {
             fechaFactura: null,
             numFacturaEmitida: numFactura || null,
             facturaEmitidaUrl: null,
-            diasCobroCliente: cliente ? cliente.diasCobro : 30,
+            diasCobroCliente: diasCobro,
             presupuestoMoraGenerado: null,
             moraSaldada: false
         };
 
+        // 🔥 v7.22.16: subir OC del cliente a Storage (no base64)
         if (archivoOC) {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                nuevaVenta.ocArchivoUrl = e.target.result;
-                nuevaVenta.ocArchivoNombre = archivoOC.name;
+            (async () => {
+                try {
+                    const { subirArchivo, comprimirImagen, getEmpresaActual } = await import('../firebase.js');
+                    const fileComprimido = await comprimirImagen(archivoOC);
+                    const ext = (fileComprimido.name.split('.').pop() || 'bin').toLowerCase();
+                    const empresaId = getEmpresaActual() || 'empresa_principal';
+                    const ruta = `${empresaId}/presupuestos/oc_cliente_${Date.now()}.${ext}`;
+                    const url = await subirArchivo(ruta, fileComprimido);
+                    nuevaVenta.ocArchivoUrl = url;
+                    nuevaVenta.ocArchivoNombre = fileComprimido.name;
+                    console.log('✅ OC del cliente subida a Storage:', url.substring(0, 80) + '...');
+                } catch (e) {
+                    console.error('❌ Error subiendo OC:', e);
+                    mostrarNotificacion('Error subiendo OC: ' + e.message, 'error');
+                }
                 guardarVentaCompleta(nuevaVenta, presupuesto);
-            };
-            reader.readAsDataURL(archivoOC);
+            })();
         } else {
             guardarVentaCompleta(nuevaVenta, presupuesto);
         }
@@ -193,6 +217,12 @@ function guardarVentaCompleta(nuevaVenta, presupuesto) {
     if (presIndex !== -1) {
         db.presupuestos[presIndex].estado = 'aprobado';
         db.presupuestos[presIndex].ventaGeneradaId = nuevaVenta.id;
+        db.presupuestos[presIndex].fechaAprobacion = hoyISO();
+        // 🔥 v7.22.16: guardar OC del cliente en el presupuesto
+        if (nuevaVenta.ocArchivoUrl) {
+            db.presupuestos[presIndex].ocClienteUrl = nuevaVenta.ocArchivoUrl;
+            db.presupuestos[presIndex].ocClienteNombre = nuevaVenta.ocArchivoNombre;
+        }
     }
 
     if (presupuesto.deudasIncluidas && presupuesto.deudasIncluidas.length > 0) {

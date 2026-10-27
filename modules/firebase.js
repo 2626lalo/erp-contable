@@ -383,3 +383,17 @@ export async function comprimirImagen(file, maxAncho = 1600, calidad = 0.7) {
         reader.readAsDataURL(file);
     });
 }
+
+// ==================== 🔥 v7.22.23: ELIMINAR ARCHIVO DE STORAGE ====================
+export async function eliminarArchivoDeStorage(url) {
+    if (!url || !url.startsWith('https://firebasestorage')) return;
+    if (!firebaseReady || !storage || !firebaseModules) return;
+    try {
+        const { ref, deleteObject } = firebaseModules.storage;
+        const storageRef = ref(storage, url);
+        await deleteObject(storageRef);
+        console.log('🗑️ Archivo eliminado de Storage:', url.substring(0, 80) + '...');
+    } catch (e) {
+        console.warn('⚠️ Error eliminando archivo de Storage:', e);
+    }
+}

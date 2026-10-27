@@ -3,7 +3,7 @@
 // ERP Contable Argentina - v7.16.1
 
 import { getDB, guardarDB } from '../db.js';
-import { formatNumber, mostrarNotificacion, escapeHtml, formatDate, generarId } from '../utils.js';
+import { formatNumber, mostrarNotificacion, escapeHtml, formatDate, generarId, confirmarAccion} from '../utils.js';
 import { crearModal, cerrarModal } from './helpers.js';
 
 // ==================== RENDER TAB ====================
@@ -258,8 +258,8 @@ window.editarProducto = (id) => {
 };
 
 // ==================== ELIMINAR ====================
-window.eliminarProducto = (id) => {
-    if (!confirm('¿Eliminar este producto? Se eliminarán también sus movimientos de stock.')) return;
+window.eliminarProducto = async (id) => {
+    if (!(await confirmarAccion({ titulo: '🗑️ Eliminar producto', mensaje: '¿Eliminar este producto? Se eliminarán también sus movimientos de stock.', textoConfirmar: '🗑️ Sí, eliminar', icono: '📦' }))) return;
     const db = getDB();
     db.productos = db.productos.filter(p => p.id !== id);
     db.movimientosStock = db.movimientosStock.filter(m => m.productoId !== id);

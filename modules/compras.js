@@ -84,47 +84,80 @@ function renderListaMovimientos() {
         filtrados.sort((a, b) => (a.fechaVencimientoPago || a.fechaEmision || '9999-12-31').localeCompare(b.fechaVencimientoPago || b.fechaEmision || '9999-12-31'));
     }
 
-    return filtrados.map(m => {
-        const idStr = String(m.id);
-        const esPagado = m.estadoPago === 'PAGADO';
-        const tipoFactura = m.tipoFactura || 'A';
-        const ivaDescontable = m.ivaDescontable !== undefined ? m.ivaDescontable : (tipoFactura === 'A');
-        const facturaLabel = tipoFactura === 'A' ? 'Factura A (IVA desc.)' :
-                            tipoFactura === 'B' ? 'Factura B (IVA no desc.)' :
-                            tipoFactura === 'C' ? 'Factura C (IVA no desc.)' : 'Sin factura';
+    // 🔥 v7.24.1: Sectorizar por estado
+    const grupos = {
+        'pendiente': { titulo: '⏳ Pendientes de Pago', items: [] },
+        'pagado': { titulo: '✅ Pagadas', items: [] }
+    };
 
-        return `
-            <div class="p-4 hover:bg-gray-50 dark:hover:bg-gray-700 flex justify-between items-center border-b">
-                <div class="flex-1">
-                    <p class="font-medium">${escapeHtml(m.concepto || 'Sin concepto')}</p>
-                    <p class="text-xs text-gray-500">
-                        ${m.fechaEmision ? formatDate(m.fechaEmision) : 'Sin fecha'} • 
-                        ${m.categoria || 'Sin categoría'} • 
-                        ${m.tipo || 'Compra'}
-                        <span class="ml-2 ${esPagado ? 'text-green-600 font-bold' : 'text-yellow-600 font-bold'}">${esPagado ? '✅ Pagado' : '⏳ Pendiente'}</span>
-                        <span class="ml-2 text-xs ${ivaDescontable ? 'text-green-600' : 'text-red-400'}">${facturaLabel}</span>
-                    </p>
-                    ${m.numeroFactura ? `<p class="text-xs text-gray-400">Factura: ${escapeHtml(m.numeroFactura)}</p>` : ''}
-                    ${m.metodoPago ? `<p class="text-xs text-gray-400">💳 ${escapeHtml(m.metodoPago)}</p>` : ''}
-                    ${!esPagado && m.fechaVencimientoPago ? `<p class="text-xs text-red-400">Vence: ${formatDate(m.fechaVencimientoPago)}</p>` : ''}
-                    ${esPagado && m.fechaPago ? `<p class="text-xs text-green-600">Pagado: ${formatDate(m.fechaPago)}</p>` : ''}
-                    ${m.archivoUrl ? `<a href="${m.archivoUrl}" target="_blank" class="text-xs text-blue-600 underline">📎 Ver archivo</a>` : ''}
-                    <div class="flex gap-3 mt-1 text-xs flex-wrap">
-                        <span class="text-gray-500">Neto: $${formatNumber(m.montoNeto || 0)}</span>
-                        <span class="text-gray-500">IVA: $${formatNumber(m.ivaMonto || 0)}</span>
-                        <span class="font-bold ${esPagado ? 'text-green-600' : 'text-gray-700'}">Total: $${formatNumber(m.totalFactura || 0)}</span>
-                    </div>
-                    <button onclick="event.stopPropagation();window.verTrazabilidad('compra','${idStr}')" class="text-xs text-purple-600 hover:underline mt-1">🔗 Ver trazabilidad</button>
-                </div>
-                <div class="flex items-center gap-1">
-                    ${!esPagado ? `<button onclick="window.pagarCompra('${idStr}')" class="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-sm">✅ Pagar</button>` : ''}
-                                        <button onclick="window.verDetalleCompra('${idStr}')" class="bg-gray-100 text-gray-600 px-2 py-1 rounded text-sm" title="Ver detalles">👁️</button>
-                    <button onclick="event.stopPropagation();window.editarCompra('${idStr}')" class="bg-blue-100 text-blue-700 px-2 py-1 rounded text-sm" title="Editar">✏️</button>
-                    <button onclick="event.stopPropagation();window.eliminarCompra('${idStr}')" class="bg-red-100 text-red-700 px-2 py-1 rounded text-sm" title="Eliminar">🗑️</button>
-                </div>
+    filtrados.forEach(m => {
+        const esPagado = m.estadoPago === 'PAGADO';
+        if (esPagado) {
+            grupos['pagado'].items.push(m);
+        } else {
+            grupos['pendiente'].items.push(m);
+        }
+    });
+
+    // Ordenar: pendientes por vencimiento (más próximo primero), pagadas por fecha de pago (más reciente primero)
+    grupos.pendiente.items.sort((a, b) => (a.fechaVencimientoPago || '9999-12-31').localeCompare(b.fechaVencimientoPago || '9999-12-31'));
+    grupos.pagado.items.sort((a, b) => (b.fechaPago || '').localeCompare(a.fechaPago || ''));
+
+    let html = '';
+    Object.values(grupos).forEach(grupo => {
+        if (grupo.items.length === 0) return;
+        html += `
+            <div class="flex items-center gap-3 my-4 px-4">
+                <div class="h-px flex-1 bg-gray-300 dark:bg-gray-600"></div>
+                <span class="text-sm font-bold text-gray-600 dark:text-gray-400">${grupo.titulo} (${grupo.items.length})</span>
+                <div class="h-px flex-1 bg-gray-300 dark:bg-gray-600"></div>
             </div>
         `;
-    }).join('');
+        html += grupo.items.map(m => {
+            const idStr = String(m.id);
+            const esPagado = m.estadoPago === 'PAGADO';
+            const tipoFactura = m.tipoFactura || 'A';
+            const ivaDescontable = m.ivaDescontable !== undefined ? m.ivaDescontable : (tipoFactura === 'A');
+            const facturaLabel = tipoFactura === 'A' ? 'Factura A (IVA desc.)' :
+                                tipoFactura === 'B' ? 'Factura B (IVA no desc.)' :
+                                tipoFactura === 'C' ? 'Factura C (IVA no desc.)' : 'Sin factura';
+
+            return `
+                <div class="p-4 hover:bg-gray-50 dark:hover:bg-gray-700 flex justify-between items-center border-b">
+                    <div class="flex-1">
+                        <p class="font-medium">${escapeHtml(m.concepto || 'Sin concepto')}</p>
+                        <p class="text-xs text-gray-500">
+                            ${m.fechaEmision ? formatDate(m.fechaEmision) : 'Sin fecha'} • 
+                            ${m.categoria || 'Sin categoría'} • 
+                            ${m.tipo || 'Compra'}
+                            <span class="ml-2 ${esPagado ? 'text-green-600 font-bold' : 'text-yellow-600 font-bold'}">${esPagado ? '✅ Pagado' : '⏳ Pendiente'}</span>
+                            <span class="ml-2 text-xs ${ivaDescontable ? 'text-green-600' : 'text-red-400'}">${facturaLabel}</span>
+                        </p>
+                        ${m.numeroFactura ? `<p class="text-xs text-gray-400">Factura: ${escapeHtml(m.numeroFactura)}</p>` : ''}
+                        ${m.metodoPago ? `<p class="text-xs text-gray-400">💳 ${escapeHtml(m.metodoPago)}</p>` : ''}
+                        ${!esPagado && m.fechaVencimientoPago ? `<p class="text-xs text-red-400">Vence: ${formatDate(m.fechaVencimientoPago)}</p>` : ''}
+                        ${esPagado && m.fechaPago ? `<p class="text-xs text-green-600">Pagado: ${formatDate(m.fechaPago)}</p>` : ''}
+                        ${m.archivoUrl ? `<a href="${m.archivoUrl}" target="_blank" class="text-xs text-blue-600 underline">📎 Ver archivo</a>` : ''}
+                        <div class="flex gap-3 mt-1 text-xs flex-wrap">
+                            <span class="text-gray-500">Neto: $${formatNumber(m.montoNeto || 0)}</span>
+                            <span class="text-gray-500">IVA: $${formatNumber(m.ivaMonto || 0)}</span>
+                            <span class="font-bold ${esPagado ? 'text-green-600' : 'text-gray-700'}">Total: $${formatNumber(m.totalFactura || 0)}</span>
+                        </div>
+                        <button onclick="event.stopPropagation();window.verTrazabilidad('compra','${idStr}')" class="text-xs text-purple-600 hover:underline mt-1">🔗 Ver trazabilidad</button>
+                    </div>
+                    <div class="flex items-center gap-1">
+                        ${!esPagado ? `<button onclick="window.pagarCompra('${idStr}')" class="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-sm">✅ Pagar</button>` : ''}
+                        <button onclick="window.verDetalleCompra('${idStr}')" class="bg-gray-100 text-gray-600 px-2 py-1 rounded text-sm" title="Ver detalles">👁️</button>
+                        <button onclick="event.stopPropagation();window.editarCompra('${idStr}')" class="bg-blue-100 text-blue-700 px-2 py-1 rounded text-sm" title="Editar">✏️</button>
+                        <button onclick="event.stopPropagation();window.eliminarCompra('${idStr}')" class="bg-red-100 text-red-700 px-2 py-1 rounded text-sm" title="Eliminar">🗑️</button>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    });
+
+    if (html === '') return '<div class="p-8 text-center text-gray-400">No hay movimientos</div>';
+    return html;
 }
 
 function obtenerMovimientosLocal() {
@@ -901,7 +934,7 @@ window.mostrarModalNuevaCompra = () => {
         if (filtrados.length === 0) { provLista.classList.add('hidden'); return; }
         provLista.innerHTML = filtrados.map(p => `
             <div class="px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer border-b last:border-b-0" 
-                 onclick="window.seleccionarProveedor('${p.id}')">
+                 onclick="window.seleccionarProveedor('${String(p.id)}')">
                 <strong>${escapeHtml(p.nombre)}</strong>
                 ${p.cuit ? `<span class="text-xs text-gray-500 ml-2">CUIT: ${escapeHtml(p.cuit)}</span>` : ''}
             </div>
@@ -917,9 +950,13 @@ window.mostrarModalNuevaCompra = () => {
 
     window.seleccionarProveedor = (id) => {
         const db = getDB();
-        const prov = db.proveedores.find(p => p.id === id);
-        if (!prov) return;
-        provInput.value = prov.nombre;
+        // 🔥 v7.24.9: Comparar como strings para evitar problemas de tipo
+        const prov = db.proveedores.find(p => String(p.id) === String(id));
+        if (!prov) {
+            console.warn('⚠️ Proveedor no encontrado con ID:', id);
+            return;
+        }
+        provInput.value = prov.nombre || '';
         provCuitInput.value = prov.cuit || '';
 
         // 🔥 v7.16.28: autocargar datos de contacto del proveedor seleccionado

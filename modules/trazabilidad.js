@@ -60,7 +60,7 @@ function construirArbolDesdeCompra(db, compra) {
                 const nodoVenta = {
                     id: venta.id,
                     tipo: 'venta',
-                    label: `Venta ${venta.numComprobante || 'sin número'}`,
+                    label: `Venta ${venta.numFacturaEmitida || venta.numComprobante || 'sin número'}`,
                     detalle: `${venta.clienteNombre} - $${formatNumber(venta.total)}`,
                     fecha: venta.fechaVenta,
                     children: []
@@ -116,14 +116,42 @@ function construirArbolDesdePresupuesto(db, presupuesto) {
     if (presupuesto.ventaGeneradaId) {
         const venta = db.ventas.find(v => String(v.id) === String(presupuesto.ventaGeneradaId));
         if (venta) {
+            // 🔥 v7.22.37: si es venta agrupada, mostrar los N presupuestos origen
+            const esAgrupada = venta.esVentaAgrupada === true;
+            const labelVenta = esAgrupada
+                ? `📦 Venta agrupada (${(venta.presupuestosOrigenNumeros || []).length} presupuestos)`
+                : `Venta ${venta.numFacturaEmitida || venta.numComprobante || 'sin número'}`;
+            const detalleVenta = esAgrupada
+                ? `${venta.clienteNombre} - $${formatNumber(venta.total)} (incluye: ${(venta.presupuestosOrigenNumeros || []).join(', ')})`
+                : `${venta.clienteNombre} - $${formatNumber(venta.total)}`;
+            
             const nodoVenta = {
                 id: venta.id,
                 tipo: 'venta',
-                label: `Venta ${venta.numComprobante || 'sin número'}`,
-                detalle: `${venta.clienteNombre} - $${formatNumber(venta.total)}`,
+                label: labelVenta,
+                detalle: detalleVenta,
                 fecha: venta.fechaVenta,
                 children: []
             };
+            
+            // 🔥 Si es agrupada, agregar los otros presupuestos como hijos
+            if (esAgrupada && venta.presupuestosOrigenIds) {
+                const otrosPresupuestos = db.presupuestos.filter(p => 
+                    venta.presupuestosOrigenIds.some(id => String(id) === String(p.id)) &&
+                    String(p.id) !== String(presupuesto.id)
+                );
+                otrosPresupuestos.forEach(otro => {
+                    nodoVenta.children.push({
+                        id: otro.id,
+                        tipo: 'presupuesto',
+                        label: `Presupuesto ${otro.numero}`,
+                        detalle: `${otro.cliente} - $${formatNumber(otro.total)}`,
+                        fecha: otro.fechaCreacion,
+                        children: []
+                    });
+                });
+            }
+            
             if (venta.estado === 'cobrado') {
                 nodoVenta.children.push({
                     id: venta.id,
@@ -158,12 +186,88 @@ function construirArbolDesdeVenta(db, venta) {
     const raiz = {
         id: venta.id,
         tipo: 'venta',
-        label: `Venta ${venta.numComprobante || 'sin número'}`,
+        label: `Venta ${venta.numFacturaEmitida || venta.numComprobante || 'sin número'}`,
         detalle: `${venta.clienteNombre} - $${formatNumber(venta.total)}`,
         fecha: venta.fechaVenta,
         children: []
     };
 
+    // 🔥 v7.22.37: si es venta agrupada, mostrar TODOS los presupuestos origen
+    if (venta.esVentaAgrupada && venta.presupuestosOrigenIds) {
+        const presupuestosAgrupados = db.presupuestos.filter(p => 
+            venta.presupuestosOrigenIds.some(id => String(id) === String(p.id))
+        );
+        presupuestosAgrupados.forEach(p => {
+            const nodoPres = {
+                id: p.id,
+                tipo: 'presupuesto',
+                label: `Presupuesto ${p.numero}`,
+                detalle: `${p.cliente} - $${formatNumber(p.total)}`,
+                fecha: p.fechaCreacion,
+                children: []
+            };
+            
+            // 🔥 v7.24.6: No agregar compras a cada presupuesto (se agregan una sola vez a la raíz)
+            
+            raiz.children.push(nodoPres);
+        });
+        
+        // 🔥 v7.24.6: Agregar compras vinculadas UNA SOLA VEZ a la raíz
+        const comprasSet = new Set();
+        const comprasUnicas = [];
+        
+        // 1. Compras vinculadas directamente a la venta
+        (venta.comprasVinculadas || []).forEach(cv => {
+            const compra = db.compras.find(c => String(c.id) === String(cv.compraId));
+            if (compra && !comprasSet.has(String(compra.id))) {
+                comprasSet.add(String(compra.id));
+                comprasUnicas.push(compra);
+            }
+        });
+        
+        // 2. Compras vinculadas a través de los ítems de los presupuestos
+        (venta.presupuestosOrigenIds || []).forEach(pid => {
+            const p = db.presupuestos.find(x => String(x.id) === String(pid));
+            if (p && p.items) {
+                p.items.forEach(item => {
+                    if (item.compraVinculadaId) {
+                        const compra = db.compras.find(c => String(c.id) === String(item.compraVinculadaId));
+                        if (compra && !comprasSet.has(String(compra.id))) {
+                            comprasSet.add(String(compra.id));
+                            comprasUnicas.push(compra);
+                        }
+                    }
+                });
+            }
+        });
+        
+        comprasUnicas.forEach(compra => {
+            raiz.children.push({
+                id: compra.id,
+                tipo: 'compra',
+                label: `Compra ${compra.numeroFactura || 'sin número'}`,
+                detalle: `${compra.proveedorNombre || compra.concepto} - $${formatNumber(compra.totalFactura)}`,
+                fecha: compra.fechaEmision,
+                children: []
+            });
+        });
+        
+        // Si la venta está cobrada, agregar nodo de cobro
+        if (venta.estado === 'cobrado') {
+            raiz.children.push({
+                id: venta.id,
+                tipo: 'cobro',
+                label: `Cobro ${venta.comprobanteCobro || 'registrado'}`,
+                detalle: `$${formatNumber(venta.total)} - ${venta.medioPago || 'N/A'}`,
+                fecha: venta.fechaCobro,
+                children: []
+            });
+        }
+        
+        return [raiz];
+    }
+
+    // Flujo individual (como antes)
     let presupuesto = null;
     if (venta.presupuestoId) {
         presupuesto = db.presupuestos.find(p => String(p.id) === String(venta.presupuestoId));

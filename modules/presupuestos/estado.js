@@ -18,6 +18,8 @@ export const NUMERO_INICIAL_PRESUPUESTO = 867;
 // Opciones de acción
 export const OPCIONES_ACCION = [
     { value: '', label: '-' },
+    { value: 'REP - Repuesto', label: 'REP - Repuesto' },
+    { value: 'MO - Mano de Obra', label: 'MO - Mano de Obra' },
     { value: 'C - Cambiar', label: 'C - Cambiar' },
     { value: 'R - Reparar', label: 'R - Reparar' },
     { value: 'M - Mecánica y Electricidad', label: 'M - Mecánica y Electricidad' },

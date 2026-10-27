@@ -5,8 +5,7 @@
 import { getDB, guardarDB } from '../db.js';
 import {
     formatNumber, mostrarNotificacion, escapeHtml, formatDate, generarId,
-    calcularSaldoCliente, obtenerVentasPendientesCliente, obtenerTotalVentasCliente
-} from '../utils.js';
+    calcularSaldoCliente, obtenerVentasPendientesCliente, obtenerTotalVentasCliente, confirmarAccion} from '../utils.js';
 import {
     crearModal,
     cerrarModal,
@@ -228,8 +227,8 @@ window.editarCliente = (id) => {
 };
 
 // ==================== ELIMINAR ====================
-window.eliminarCliente = (id) => {
-    if (!confirm('¿Eliminar este cliente? No se podrá recuperar.')) return;
+window.eliminarCliente = async (id) => {
+    if (!(await confirmarAccion({ titulo: '🗑️ Eliminar cliente', mensaje: '¿Eliminar este cliente? No se podrá recuperar.', textoConfirmar: '🗑️ Sí, eliminar', icono: '👤' }))) return;
     const db = getDB();
     db.clientes = db.clientes.filter(c => c.id !== id);
     guardarDB();

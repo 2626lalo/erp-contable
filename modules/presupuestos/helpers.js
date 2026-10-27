@@ -46,9 +46,10 @@ export function procesarTextoItem(texto) {
     return texto.toUpperCase().trim();
 }
 
-export function getVigenciaTexto() {
-    const fecha = new Date();
-    fecha.setDate(fecha.getDate() + 7);
+export function getVigenciaTexto(fechaEmision = null, dias = 7) {
+    // 🔥 v7.22.13: usar fecha de emisión + días de validez
+    const fecha = fechaEmision ? new Date(fechaEmision + 'T12:00:00') : new Date();
+    fecha.setDate(fecha.getDate() + dias);
     return `Este presupuesto tiene validez hasta el ${fecha.toLocaleDateString('es-AR')}`;
 }
 

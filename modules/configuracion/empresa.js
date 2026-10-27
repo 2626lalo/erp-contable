@@ -7,8 +7,7 @@
 import { getDB, guardarDB, crearMovimiento } from '../db.js';
 import {
     formatNumber, mostrarNotificacion, escapeHtml, formatDate, generarId,
-    inputFechaHTML, initInputFecha, getValorFecha
-} from '../utils.js';
+    inputFechaHTML, initInputFecha, getValorFecha, confirmarAccion} from '../utils.js';
 import {
     crearModal,
     cerrarModal,
@@ -304,8 +303,8 @@ window.subirLogoEmpresa = async (input) => {
 };
 
 // ==================== LOGO: ELIMINAR ====================
-window.eliminarLogoEmpresa = () => {
-    if (!confirm('¿Eliminar el logo actual?')) return;
+window.eliminarLogoEmpresa = async () => {
+    if (!(await confirmarAccion({ titulo: '🗑️ Eliminar logo', mensaje: '¿Eliminar el logo actual?', textoConfirmar: '🗑️ Sí, eliminar', icono: '🖼️' }))) return;
     const db = getDB();
     if (db.datosEmpresa) db.datosEmpresa.logoUrl = null;
     guardarDB();
@@ -418,8 +417,8 @@ function mapearMedioAKey(medioEspanol) {
     return mapa[medioEspanol] || 'otro';
 }
 
-window.eliminarAporte = (id) => {
-    if (!confirm('¿Eliminar este aporte? Se eliminará también el movimiento asociado en tesorería. No se podrá recuperar.')) return;
+window.eliminarAporte = async (id) => {
+    if (!(await confirmarAccion({ titulo: '🗑️ Eliminar aporte', mensaje: '¿Eliminar este aporte? Se eliminará también el movimiento asociado en tesorería. No se podrá recuperar.', textoConfirmar: '🗑️ Sí, eliminar', icono: '💰' }))) return;
     const db = getDB();
 
     // 1. Buscar el aporte
@@ -462,8 +461,8 @@ window.agregarEmail = () => {
     if (radios.length === 1) radios[0].checked = true;
 };
 
-window.eliminarEmail = (btn) => {
-    if (!confirm('¿Eliminar este email?')) return;
+window.eliminarEmail = async (btn) => {
+    if (!(await confirmarAccion({ titulo: '🗑️ Eliminar email', mensaje: '¿Eliminar este email?', textoConfirmar: '🗑️ Sí, eliminar', icono: '📧' }))) return;
     const row = btn.closest('.flex') || btn.parentElement;
     if (row) row.remove();
 };
@@ -487,8 +486,8 @@ window.agregarTelefono = () => {
     if (radios.length === 1) radios[0].checked = true;
 };
 
-window.eliminarTelefono = (btn) => {
-    if (!confirm('¿Eliminar este teléfono?')) return;
+window.eliminarTelefono = async (btn) => {
+    if (!(await confirmarAccion({ titulo: '🗑️ Eliminar teléfono', mensaje: '¿Eliminar este teléfono?', textoConfirmar: '🗑️ Sí, eliminar', icono: '📞' }))) return;
     const row = btn.closest('.flex') || btn.parentElement;
     if (row) row.remove();
 };

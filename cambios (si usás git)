@@ -1,0 +1,1131 @@
+[1mdiff --git a/app.js b/app.js[m
+[1mindex 562af16..25726d5 100644[m
+[1m--- a/app.js[m
+[1m+++ b/app.js[m
+[36m@@ -620,3 +620,8 @@[m [mexport function iniciarFechaHora() {[m
+     actualizarFechaHora();[m
+     setInterval(actualizarFechaHora, 60000); // cada 60 segundos[m
+ }[m
+[32m+[m
+[32m+[m
+[32m+[m[32m// --- Fix vista previa y eliminar factura ---[m
+[41m+[m
+[41m+[m
+[1mdiff --git a/firebase-debug.log b/firebase-debug.log[m
+[1mdeleted file mode 100644[m
+[1mindex d2b677e..0000000[m
+[1m--- a/firebase-debug.log[m
+[1m+++ /dev/null[m
+[36m@@ -1,104 +0,0 @@[m
+[31m-[debug] [2026-08-25T05:25:48.821Z] ----------------------------------------------------------------------[m
+[31m-[debug] [2026-08-25T05:25:48.824Z] Command:       /usr/local/nvm/versions/node/v24.19.0/bin/node /usr/local/node_packages/node_modules/.bin/firebase init hosting[m
+[31m-[debug] [2026-08-25T05:25:48.825Z] CLI Version:   15.27.0[m
+[31m-[debug] [2026-08-25T05:25:48.825Z] Platform:      linux[m
+[31m-[debug] [2026-08-25T05:25:48.826Z] Node Version:  v24.19.0[m
+[31m-[debug] [2026-08-25T05:25:48.826Z] Detected Agent: unknown[m
+[31m-[debug] [2026-08-25T05:25:48.826Z] Time:          Tue Aug 25 2026 05:25:48 GMT+0000 (Coordinated Universal Time)[m
+[31m-[debug] [2026-08-25T05:25:48.826Z] ----------------------------------------------------------------------[m
+[31m-[debug] [m
+[31m-[debug] [2026-08-25T05:25:48.850Z] >>> [apiv2][query] GET https://firebase-public.firebaseio.com/cli.json [none][m
+[31m-[debug] [2026-08-25T05:25:48.851Z] >>> [apiv2][(partial)header] GET https://firebase-public.firebaseio.com/cli.json  x-goog-user-project=project-e503fb62-86f9-48a2-b92[m
+[31m-[info] [m
+[31m-     ######## #### ########  ######## ########     ###     ######  ########[m
+[31m-     ##        ##  ##     ## ##       ##     ##  ##   ##  ##       ##[m
+[31m-     ######    ##  ########  ######   ########  #########  ######  ######[m
+[31m-     ##        ##  ##    ##  ##       ##     ## ##     ##       ## ##[m
+[31m-     ##       #### ##     ## ######## ########  ##     ##  ######  ########[m
+[31m-[m
+[31m-You're about to initialize a Firebase project in this directory:[m
+[31m-[m
+[31m-  /home/alewilczek[m
+[31m-[m
+[31m-Before we get started, keep in mind:[m
+[31m-[m
+[31m-  * You are initializing within an existing Firebase project directory[m
+[31m-[m
+[31m-[info] [m
+[31m-=== Project Setup[m
+[31m-[info] [m
+[31m-[info] First, let's associate this project directory with a Firebase project.[m
+[31m-[info] You can create multiple project aliases by running firebase use --add, [m
+[31m-[info] [m
+[31m-[debug] [2026-08-25T05:25:52.286Z] <<< [apiv2][status] GET https://firebase-public.firebaseio.com/cli.json 200[m
+[31m-[debug] [2026-08-25T05:25:52.286Z] <<< [apiv2][body] GET https://firebase-public.firebaseio.com/cli.json {"cloudBuildErrorAfter":1594252800000,"cloudBuildWarnAfter":1590019200000,"defaultNode10After":1594252800000,"minVersion":"3.0.5","node8DeploysDisabledAfter":1613390400000,"node8RuntimeDisabledAfter":1615809600000,"node8WarnAfter":1600128000000}[m
+[31m-[debug] [2026-08-25T05:26:05.461Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"][m
+[31m-[debug] [2026-08-25T05:26:05.462Z] > authorizing via signed-in user (alewilczek@gmail.com)[m
+[31m-[debug] [2026-08-25T05:26:05.463Z] Checked if tokens are valid: false, expires at: 1785353328241[m
+[31m-[debug] [2026-08-25T05:26:05.463Z] Checked if tokens are valid: false, expires at: 1785353328241[m
+[31m-[debug] [2026-08-25T05:26:05.463Z] > refreshing access token with scopes: [][m
+[31m-[debug] [2026-08-25T05:26:05.465Z] >>> [apiv2][query] POST https://www.googleapis.com/oauth2/v3/token [none][m
+[31m-[debug] [2026-08-25T05:26:05.465Z] >>> [apiv2][(partial)header] POST https://www.googleapis.com/oauth2/v3/token  x-goog-user-project=project-e503fb62-86f9-48a2-b92[m
+[31m-[debug] [2026-08-25T05:26:05.466Z] >>> [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted][m
+[31m-[debug] [2026-08-25T05:26:05.534Z] <<< [apiv2][status] POST https://www.googleapis.com/oauth2/v3/token 200[m
+[31m-[debug] [2026-08-25T05:26:05.535Z] <<< [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted][m
+[31m-[debug] [2026-08-25T05:26:05.548Z] >>> [apiv2][query] GET https://firebase.googleapis.com/v1beta1/projects pageSize=100[m
+[31m-[debug] [2026-08-25T05:26:05.548Z] >>> [apiv2][(partial)header] GET https://firebase.googleapis.com/v1beta1/projects  x-goog-user-project=project-e503fb62-86f9-48a2-b92[m
+[31m-[debug] [2026-08-25T05:26:05.907Z] <<< [apiv2][status] GET https://firebase.googleapis.com/v1beta1/projects 200[m
+[31m-[debug] [2026-08-25T05:26:05.907Z] <<< [apiv2][body] GET https://firebase.googleapis.com/v1beta1/projects [omitted][m
+[31m-[debug] [2026-08-25T05:26:50.940Z] ExitPromptError: User force closed the prompt with SIGINT[m
+[31m-    at Interface.sigint (/usr/local/node_packages/node_modules/@inquirer/select/node_modules/@inquirer/core/dist/commonjs/lib/create-prompt.js:101:37)[m
+[31m-    at Interface.emit (node:events:509:28)[m
+[31m-    at [_ttyWrite] [as _ttyWrite] (node:internal/readline/interface:1327:18)[m
+[31m-    at ReadStream.onkeypress (node:internal/readline/interface:284:20)[m
+[31m-    at ReadStream.emit (node:events:521:24)[m
+[31m-    at emitKeys (node:internal/readline/utils:371:14)[m
+[31m-    at emitKeys.next (<anonymous>)[m
+[31m-    at ReadStream.onData (node:internal/readline/emitKeypressEvents:64:36)[m
+[31m-    at ReadStream.emit (node:events:509:28)[m
+[31m-    at addChunk (node:internal/streams/readable:563:12)[m
+[31m-[error] [m
+[31m-[error] Error: An unexpected error has occurred.[m
+[31m-[debug] [2026-08-25T05:27:09.743Z] ----------------------------------------------------------------------[m
+[31m-[debug] [2026-08-25T05:27:09.746Z] Command:       /usr/local/nvm/versions/node/v24.19.0/bin/node /usr/local/node_packages/node_modules/.bin/firebase init hosting[m
+[31m-[debug] [2026-08-25T05:27:09.747Z] CLI Version:   15.27.0[m
+[31m-[debug] [2026-08-25T05:27:09.747Z] Platform:      linux[m
+[31m-[debug] [2026-08-25T05:27:09.747Z] Node Version:  v24.19.0[m
+[31m-[debug] [2026-08-25T05:27:09.748Z] Detected Agent: unknown[m
+[31m-[debug] [2026-08-25T05:27:09.748Z] Time:          Tue Aug 25 2026 05:27:09 GMT+0000 (Coordinated Universal Time)[m
+[31m-[debug] [2026-08-25T05:27:09.748Z] ----------------------------------------------------------------------[m
+[31m-[debug] [m
+[31m-[info] [m
+[31m-     ######## #### ########  ######## ########     ###     ######  ########[m
+[31m-     ##        ##  ##     ## ##       ##     ##  ##   ##  ##       ##[m
+[31m-     ######    ##  ########  ######   ########  #########  ######  ######[m
+[31m-     ##        ##  ##    ##  ##       ##     ## ##     ##       ## ##[m
+[31m-     ##       #### ##     ## ######## ########  ##     ##  ######  ########[m
+[31m-[m
+[31m-You're about to initialize a Firebase project in this directory:[m
+[31m-[m
+[31m-  /home/alewilczek[m
+[31m-[m
+[31m-Before we get started, keep in mind:[m
+[31m-[m
+[31m-  * You are initializing within an existing Firebase project directory[m
+[31m-[m
+[31m-[info] [m
+[31m-=== Project Setup[m
+[31m-[info] [m
+[31m-[info] First, let's associate this project directory with a Firebase project.[m
+[31m-[info] You can create multiple project aliases by running firebase use --add, [m
+[31m-[info] [m
+[31m-[debug] [2026-08-25T05:27:34.239Z] ExitPromptError: User force closed the prompt with SIGINT[m
+[31m-    at Interface.sigint (/usr/local/node_packages/node_modules/@inquirer/select/node_modules/@inquirer/core/dist/commonjs/lib/create-prompt.js:101:37)[m
+[31m-    at Interface.emit (node:events:509:28)[m
+[31m-    at [_ttyWrite] [as _ttyWrite] (node:internal/readline/interface:1327:18)[m
+[31m-    at ReadStream.onkeypress (node:internal/readline/interface:284:20)[m
+[31m-    at ReadStream.emit (node:events:521:24)[m
+[31m-    at emitKeys (node:internal/readline/utils:371:14)[m
+[31m-    at emitKeys.next (<anonymous>)[m
+[31m-    at ReadStream.onData (node:internal/readline/emitKeypressEvents:64:36)[m
+[31m-    at ReadStream.emit (node:events:509:28)[m
+[31m-    at addChunk (node:internal/streams/readable:563:12)[m
+[31m-[error] [m
+[31m-[error] Error: An unexpected error has occurred.[m
+[1mdiff --git a/index.html b/index.html[m
+[1mindex c1967f0..4ed5e7e 100644[m
+[1m--- a/index.html[m
+[1m+++ b/index.html[m
+[36m@@ -192,6 +192,8 @@[m
+     </script>[m
+ [m
+     <!-- Script principal -->[m
+[31m-    <script type="module" src="app.js?v=7.21.6"></script>[m
+[32m+[m[32m    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>[m
+[32m+[m[32m    <script src="https://cdn.jsdelivr.net/npm/html3pdf@0.12.2/dist/html3pdf.bundle.min.js"></script>[m
+[32m+[m[32m    <script type="module" src="app.js?v=7.24.25"></script>[m
+ </body>[m
+ </html>[m
+[1mdiff --git a/modules/compras.js b/modules/compras.js[m
+[1mindex 87dc22c..d2bcac6 100644[m
+[1m--- a/modules/compras.js[m
+[1m+++ b/modules/compras.js[m
+[36m@@ -84,47 +84,80 @@[m [mfunction renderListaMovimientos() {[m
+         filtrados.sort((a, b) => (a.fechaVencimientoPago || a.fechaEmision || '9999-12-31').localeCompare(b.fechaVencimientoPago || b.fechaEmision || '9999-12-31'));[m
+     }[m
+ [m
+[31m-    return filtrados.map(m => {[m
+[31m-        const idStr = String(m.id);[m
+[32m+[m[32m    // 🔥 v7.24.1: Sectorizar por estado[m
+[32m+[m[32m    const grupos = {[m
+[32m+[m[32m        'pendiente': { titulo: '⏳ Pendientes de Pago', items: [] },[m
+[32m+[m[32m        'pagado': { titulo: '✅ Pagadas', items: [] }[m
+[32m+[m[32m    };[m
+[32m+[m
+[32m+[m[32m    filtrados.forEach(m => {[m
+         const esPagado = m.estadoPago === 'PAGADO';[m
+[31m-        const tipoFactura = m.tipoFactura || 'A';[m
+[31m-        const ivaDescontable = m.ivaDescontable !== undefined ? m.ivaDescontable : (tipoFactura === 'A');[m
+[31m-        const facturaLabel = tipoFactura === 'A' ? 'Factura A (IVA desc.)' :[m
+[31m-                            tipoFactura === 'B' ? 'Factura B (IVA no desc.)' :[m
+[31m-                            tipoFactura === 'C' ? 'Factura C (IVA no desc.)' : 'Sin factura';[m
+[31m-[m
+[31m-        return `[m
+[31m-            <div class="p-4 hover:bg-gray-50 dark:hover:bg-gray-700 flex justify-between items-center border-b">[m
+[31m-                <div class="flex-1">[m
+[31m-                    <p class="font-medium">${escapeHtml(m.concepto || 'Sin concepto')}</p>[m
+[31m-                    <p class="text-xs text-gray-500">[m
+[31m-                        ${m.fechaEmision ? formatDate(m.fechaEmision) : 'Sin fecha'} • [m
+[31m-                        ${m.categoria || 'Sin categoría'} • [m
+[31m-                        ${m.tipo || 'Compra'}[m
+[31m-                        <span class="ml-2 ${esPagado ? 'text-green-600 font-bold' : 'text-yellow-600 font-bold'}">${esPagado ? '✅ Pagado' : '⏳ Pendiente'}</span>[m
+[31m-                        <span class="ml-2 text-xs ${ivaDescontable ? 'text-green-600' : 'text-red-400'}">${facturaLabel}</span>[m
+[31m-                    </p>[m
+[31m-                    ${m.numeroFactura ? `<p class="text-xs text-gray-400">Factura: ${escapeHtml(m.numeroFactura)}</p>` : ''}[m
+[31m-                    ${m.metodoPago ? `<p class="text-xs text-gray-400">💳 ${escapeHtml(m.metodoPago)}</p>` : ''}[m
+[31m-                    ${!esPagado && m.fechaVencimientoPago ? `<p class="text-xs text-red-400">Vence: ${formatDate(m.fechaVencimientoPago)}</p>` : ''}[m
+[31m-                    ${esPagado && m.fechaPago ? `<p class="text-xs text-green-600">Pagado: ${formatDate(m.fechaPago)}</p>` : ''}[m
+[31m-                    ${m.archivoUrl ? `<a href="${m.archivoUrl}" target="_blank" class="text-xs text-blue-600 underline">📎 Ver archivo</a>` : ''}[m
+[31m-                    <div class="flex gap-3 mt-1 text-xs flex-wrap">[m
+[31m-                        <span class="text-gray-500">Neto: $${formatNumber(m.montoNeto || 0)}</span>[m
+[31m-                        <span class="text-gray-500">IVA: $${formatNumber(m.ivaMonto || 0)}</span>[m
+[31m-                        <span class="font-bold ${esPagado ? 'text-green-600' : 'text-gray-700'}">Total: $${formatNumber(m.totalFactura || 0)}</span>[m
+[31m-                    </div>[m
+[31m-                    <button onclick="event.stopPropagation();window.verTrazabilidad('compra','${idStr}')" class="text-xs text-purple-600 hover:underline mt-1">🔗 Ver trazabilidad</button>[m
+[31m-                </div>[m
+[31m-                <div class="flex items-center gap-1">[m
+[31m-                    ${!esPagado ? `<button onclick="window.pagarCompra('${idStr}')" class="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-sm">✅ Pagar</button>` : ''}[m
+[31m-                                        <button onclick="window.verDetalleCompra('${idStr}')" class="bg-gray-100 text-gray-600 px-2 py-1 rounded text-sm" title="Ver detalles">👁️</button>[m
+[31m-                    <button onclick="event.stopPropagation();window.editarCompra('${idStr}')" class="bg-blue-100 text-blue-700 px-2 py-1 rounded text-sm" title="Editar">✏️</button>[m
+[31m-                    <button onclick="event.stopPropagation();window.eliminarCompra('${idStr}')" class="bg-red-100 text-red-700 px-2 py-1 rounded text-sm" title="Eliminar">🗑️</button>[m
+[31m-                </div>[m
+[32m+[m[32m        if (esPagado) {[m
+[32m+[m[32m            grupos['pagado'].items.push(m);[m
+[32m+[m[32m        } else {[m
+[32m+[m[32m            grupos['pendiente'].items.push(m);[m
+[32m+[m[32m        }[m
+[32m+[m[32m    });[m
+[32m+[m
+[32m+[m[32m    // Ordenar: pendientes por vencimiento (más próximo primero), pagadas por fecha de pago (más reciente primero)[m
+[32m+[m[32m    grupos.pendiente.items.sort((a, b) => (a.fechaVencimientoPago || '9999-12-31').localeCompare(b.fechaVencimientoPago || '9999-12-31'));[m
+[32m+[m[32m    grupos.pagado.items.sort((a, b) => (b.fechaPago || '').localeCompare(a.fechaPago || ''));[m
+[32m+[m
+[32m+[m[32m    let html = '';[m
+[32m+[m[32m    Object.values(grupos).forEach(grupo => {[m
+[32m+[m[32m        if (grupo.items.length === 0) return;[m
+[32m+[m[32m        html += `[m
+[32m+[m[32m            <div class="flex items-center gap-3 my-4 px-4">[m
+[32m+[m[32m                <div class="h-px flex-1 bg-gray-300 dark:bg-gray-600"></div>[m
+[32m+[m[32m                <span class="text-sm font-bold text-gray-600 dark:text-gray-400">${grupo.titulo} (${grupo.items.length})</span>[m
+[32m+[m[32m                <div class="h-px flex-1 bg-gray-300 dark:bg-gray-600"></div>[m
+             </div>[m
+         `;[m
+[31m-    }).join('');[m
+[32m+[m[32m        html += grupo.items.map(m => {[m
+[32m+[m[32m            const idStr = String(m.id);[m
+[32m+[m[32m            const esPagado = m.estadoPago === 'PAGADO';[m
+[32m+[m[32m            const tipoFactura = m.tipoFactura || 'A';[m
+[32m+[m[32m            const ivaDescontable = m.ivaDescontable !== undefined ? m.ivaDescontable : (tipoFactura === 'A');[m
+[32m+[m[32m            const facturaLabel = tipoFactura === 'A' ? 'Factura A (IVA desc.)' :[m
+[32m+[m[32m                                tipoFactura === 'B' ? 'Factura B (IVA no desc.)' :[m
+[32m+[m[32m                                tipoFactura === 'C' ? 'Factura C (IVA no desc.)' : 'Sin factura';[m
+[32m+[m
+[32m+[m[32m            return `[m
+[32m+[m[32m                <div class="p-4 hover:bg-gray-50 dark:hover:bg-gray-700 flex justify-between items-center border-b">[m
+[32m+[m[32m                    <div class="flex-1">[m
+[32m+[m[32m                        <p class="font-medium">${escapeHtml(m.concepto || 'Sin concepto')}</p>[m
+[32m+[m[32m                        <p class="text-xs text-gray-500">[m
+[32m+[m[32m                            ${m.fechaEmision ? formatDate(m.fechaEmision) : 'Sin fecha'} •[m[41m [m
+[32m+[m[32m                            ${m.categoria || 'Sin categoría'} •[m[41m [m
+[32m+[m[32m                            ${m.tipo || 'Compra'}[m
+[32m+[m[32m                            <span class="ml-2 ${esPagado ? 'text-green-600 font-bold' : 'text-yellow-600 font-bold'}">${esPagado ? '✅ Pagado' : '⏳ Pendiente'}</span>[m
+[32m+[m[32m                            <span class="ml-2 text-xs ${ivaDescontable ? 'text-green-600' : 'text-red-400'}">${facturaLabel}</span>[m
+[32m+[m[32m                        </p>[m
+[32m+[m[32m                        ${m.numeroFactura ? `<p class="text-xs text-gray-400">Factura: ${escapeHtml(m.numeroFactura)}</p>` : ''}[m
+[32m+[m[32m                        ${m.metodoPago ? `<p class="text-xs text-gray-400">💳 ${escapeHtml(m.metodoPago)}</p>` : ''}[m
+[32m+[m[32m                        ${!esPagado && m.fechaVencimientoPago ? `<p class="text-xs text-red-400">Vence: ${formatDate(m.fechaVencimientoPago)}</p>` : ''}[m
+[32m+[m[32m                        ${esPagado && m.fechaPago ? `<p class="text-xs text-green-600">Pagado: ${formatDate(m.fechaPago)}</p>` : ''}[m
+[32m+[m[32m                        ${m.archivoUrl ? `<a href="${m.archivoUrl}" target="_blank" class="text-xs text-blue-600 underline">📎 Ver archivo</a>` : ''}[m
+[32m+[m[32m                        <div class="flex gap-3 mt-1 text-xs flex-wrap">[m
+[32m+[m[32m                            <span class="text-gray-500">Neto: $${formatNumber(m.montoNeto || 0)}</span>[m
+[32m+[m[32m                            <span class="text-gray-500">IVA: $${formatNumber(m.ivaMonto || 0)}</span>[m
+[32m+[m[32m                            <span class="font-bold ${esPagado ? 'text-green-600' : 'text-gray-700'}">Total: $${formatNumber(m.totalFactura || 0)}</span>[m
+[32m+[m[32m                        </div>[m
+[32m+[m[32m                        <button onclick="event.stopPropagation();window.verTrazabilidad('compra','${idStr}')" class="text-xs text-purple-600 hover:underline mt-1">🔗 Ver trazabilidad</button>[m
+[32m+[m[32m                    </div>[m
+[32m+[m[32m                    <div class="flex items-center gap-1">[m
+[32m+[m[32m                        ${!esPagado ? `<button onclick="window.pagarCompra('${idStr}')" class="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-sm">✅ Pagar</button>` : ''}[m
+[32m+[m[32m                        <button onclick="window.verDetalleCompra('${idStr}')" class="bg-gray-100 text-gray-600 px-2 py-1 rounded text-sm" title="Ver detalles">👁️</button>[m
+[32m+[m[32m                        <button onclick="event.stopPropagation();window.editarCompra('${idStr}')" class="bg-blue-100 text-blue-700 px-2 py-1 rounded text-sm" title="Editar">✏️</button>[m
+[32m+[m[32m                        <button onclick="event.stopPropagation();window.eliminarCompra('${idStr}')" class="bg-red-100 text-red-700 px-2 py-1 rounded text-sm" title="Eliminar">🗑️</button>[m
+[32m+[m[32m                    </div>[m
+[32m+[m[32m                </div>[m
+[32m+[m[32m            `;[m
+[32m+[m[32m        }).join('');[m
+[32m+[m[32m    });[m
+[32m+[m
+[32m+[m[32m    if (html === '') return '<div class="p-8 text-center text-gray-400">No hay movimientos</div>';[m
+[32m+[m[32m    return html;[m
+ }[m
+ [m
+ function obtenerMovimientosLocal() {[m
+[36m@@ -901,7 +934,7 @@[m [mwindow.mostrarModalNuevaCompra = () => {[m
+         if (filtrados.length === 0) { provLista.classList.add('hidden'); return; }[m
+         provLista.innerHTML = filtrados.map(p => `[m
+             <div class="px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer border-b last:border-b-0" [m
+[31m-                 onclick="window.seleccionarProveedor('${p.id}')">[m
+[32m+[m[32m                 onclick="window.seleccionarProveedor('${String(p.id)}')">[m
+                 <strong>${escapeHtml(p.nombre)}</strong>[m
+                 ${p.cuit ? `<span class="text-xs text-gray-500 ml-2">CUIT: ${escapeHtml(p.cuit)}</span>` : ''}[m
+             </div>[m
+[36m@@ -917,9 +950,13 @@[m [mwindow.mostrarModalNuevaCompra = () => {[m
+ [m
+     window.seleccionarProveedor = (id) => {[m
+         const db = getDB();[m
+[31m-        const prov = db.proveedores.find(p => p.id === id);[m
+[31m-        if (!prov) return;[m
+[31m-        provInput.value = prov.nombre;[m
+[32m+[m[32m        // 🔥 v7.24.9: Comparar como strings para evitar problemas de tipo[m
+[32m+[m[32m        const prov = db.proveedores.find(p => String(p.id) === String(id));[m
+[32m+[m[32m        if (!prov) {[m
+[32m+[m[32m            console.warn('⚠️ Proveedor no encontrado con ID:', id);[m
+[32m+[m[32m            return;[m
+[32m+[m[32m        }[m
+[32m+[m[32m        provInput.value = prov.nombre || '';[m
+         provCuitInput.value = prov.cuit || '';[m
+ [m
+         // 🔥 v7.16.28: autocargar datos de contacto del proveedor seleccionado[m
+[1mdiff --git a/modules/configuracion/clientes.js b/modules/configuracion/clientes.js[m
+[1mindex 499290f..6eb3603 100644[m
+[1m--- a/modules/configuracion/clientes.js[m
+[1m+++ b/modules/configuracion/clientes.js[m
+[36m@@ -5,8 +5,7 @@[m
+ import { getDB, guardarDB } from '../db.js';[m
+ import {[m
+     formatNumber, mostrarNotificacion, escapeHtml, formatDate, generarId,[m
+[31m-    calcularSaldoCliente, obtenerVentasPendientesCliente, obtenerTotalVentasCliente[m
+[31m-} from '../utils.js';[m
+[32m+[m[32m    calcularSaldoCliente, obtenerVentasPendientesCliente, obtenerTotalVentasCliente, confirmarAccion} from '../utils.js';[m
+ import {[m
+     crearModal,[m
+     cerrarModal,[m
+[36m@@ -228,8 +227,8 @@[m [mwindow.editarCliente = (id) => {[m
+ };[m
+ [m
+ // ==================== ELIMINAR ====================[m
+[31m-window.eliminarCliente = (id) => {[m
+[31m-    if (!confirm('¿Eliminar este cliente? No se podrá recuperar.')) return;[m
+[32m+[m[32mwindow.eliminarCliente = async (id) => {[m
+[32m+[m[32m    if (!(await confirmarAccion({ titulo: '🗑️ Eliminar cliente', mensaje: '¿Eliminar este cliente? No se podrá recuperar.', textoConfirmar: '🗑️ Sí, eliminar', icono: '👤' }))) return;[m
+     const db = getDB();[m
+     db.clientes = db.clientes.filter(c => c.id !== id);[m
+     guardarDB();[m
+[1mdiff --git a/modules/configuracion/costos-fijos.js b/modules/configuracion/costos-fijos.js[m
+[1mindex b326dc8..24d74f6 100644[m
+[1m--- a/modules/configuracion/costos-fijos.js[m
+[1m+++ b/modules/configuracion/costos-fijos.js[m
+[36m@@ -6,7 +6,7 @@[m
+ import { getDB, guardarDB } from '../db.js';[m
+ import {[m
+     formatNumber, mostrarNotificacion, escapeHtml, formatDate, generarId,[m
+[31m-    inputFechaHTML, initInputFecha, getValorFecha, parseFechaLocal, dateToISO, hoyISO} from '../utils.js';[m
+[32m+[m[32m    inputFechaHTML, initInputFecha, getValorFecha, parseFechaLocal, dateToISO, hoyISO, confirmarAccion} from '../utils.js';[m
+ import { crearModal, cerrarModal } from './helpers.js';[m
+ [m
+ // ==================== RENDER TAB ====================[m
+[36m@@ -157,8 +157,8 @@[m [mwindow.pagarCostoFijo = (id) => {[m
+ };[m
+ [m
+ // ==================== ELIMINAR ====================[m
+[31m-window.eliminarCostoFijo = (id) => {[m
+[31m-    if (!confirm('¿Eliminar este costo fijo? No se podrá recuperar.')) return;[m
+[32m+[m[32mwindow.eliminarCostoFijo = async (id) => {[m
+[32m+[m[32m    if (!(await confirmarAccion({ titulo: '🗑️ Eliminar costo fijo', mensaje: '¿Eliminar este costo fijo? No se podrá recuperar.', textoConfirmar: '🗑️ Sí, eliminar', icono: '📅' }))) return;[m
+     const db = getDB();[m
+     db.costosFijos = db.costosFijos.filter(c => c.id !== id);[m
+     guardarDB();[m
+[1mdiff --git a/modules/configuracion/empresa.js b/modules/configuracion/empresa.js[m
+[1mindex 7f12ef9..14b733b 100644[m
+[1m--- a/modules/configuracion/empresa.js[m
+[1m+++ b/modules/configuracion/empresa.js[m
+[36m@@ -7,8 +7,7 @@[m
+ import { getDB, guardarDB, crearMovimiento } from '../db.js';[m
+ import {[m
+     formatNumber, mostrarNotificacion, escapeHtml, formatDate, generarId,[m
+[31m-    inputFechaHTML, initInputFecha, getValorFecha[m
+[31m-} from '../utils.js';[m
+[32m+[m[32m    inputFechaHTML, initInputFecha, getValorFecha, confirmarAccion} from '../utils.js';[m
+ import {[m
+     crearModal,[m
+     cerrarModal,[m
+[36m@@ -304,8 +303,8 @@[m [mwindow.subirLogoEmpresa = async (input) => {[m
+ };[m
+ [m
+ // ==================== LOGO: ELIMINAR ====================[m
+[31m-window.eliminarLogoEmpresa = () => {[m
+[31m-    if (!confirm('¿Eliminar el logo actual?')) return;[m
+[32m+[m[32mwindow.eliminarLogoEmpresa = async () => {[m
+[32m+[m[32m    if (!(await confirmarAccion({ titulo: '🗑️ Eliminar logo', mensaje: '¿Eliminar el logo actual?', textoConfirmar: '🗑️ Sí, eliminar', icono: '🖼️' }))) return;[m
+     const db = getDB();[m
+     if (db.datosEmpresa) db.datosEmpresa.logoUrl = null;[m
+     guardarDB();[m
+[36m@@ -418,8 +417,8 @@[m [mfunction mapearMedioAKey(medioEspanol) {[m
+     return mapa[medioEspanol] || 'otro';[m
+ }[m
+ [m
+[31m-window.eliminarAporte = (id) => {[m
+[31m-    if (!confirm('¿Eliminar este aporte? Se eliminará también el movimiento asociado en tesorería. No se podrá recuperar.')) return;[m
+[32m+[m[32mwindow.eliminarAporte = async (id) => {[m
+[32m+[m[32m    if (!(await confirmarAccion({ titulo: '🗑️ Eliminar aporte', mensaje: '¿Eliminar este aporte? Se eliminará también el movimiento asociado en tesorería. No se podrá recuperar.', textoConfirmar: '🗑️ Sí, eliminar', icono: '💰' }))) return;[m
+     const db = getDB();[m
+ [m
+     // 1. Buscar el aporte[m
+[36m@@ -462,8 +461,8 @@[m [mwindow.agregarEmail = () => {[m
+     if (radios.length === 1) radios[0].checked = true;[m
+ };[m
+ [m
+[31m-window.eliminarEmail = (btn) => {[m
+[31m-    if (!confirm('¿Eliminar este email?')) return;[m
+[32m+[m[32mwindow.eliminarEmail = async (btn) => {[m
+[32m+[m[32m    if (!(await confirmarAccion({ titulo: '🗑️ Eliminar email', mensaje: '¿Eliminar este email?', textoConfirmar: '🗑️ Sí, eliminar', icono: '📧' }))) return;[m
+     const row = btn.closest('.flex') || btn.parentElement;[m
+     if (row) row.remove();[m
+ };[m
+[36m@@ -487,8 +486,8 @@[m [mwindow.agregarTelefono = () => {[m
+     if (radios.length === 1) radios[0].checked = true;[m
+ };[m
+ [m
+[31m-window.eliminarTelefono = (btn) => {[m
+[31m-    if (!confirm('¿Eliminar este teléfono?')) return;[m
+[32m+[m[32mwindow.eliminarTelefono = async (btn) => {[m
+[32m+[m[32m    if (!(await confirmarAccion({ titulo: '🗑️ Eliminar teléfono', mensaje: '¿Eliminar este teléfono?', textoConfirmar: '🗑️ Sí, eliminar', icono: '📞' }))) return;[m
+     const row = btn.closest('.flex') || btn.parentElement;[m
+     if (row) row.remove();[m
+ };[m
+[1mdiff --git a/modules/configuracion/impuestos.js b/modules/configuracion/impuestos.js[m
+[1mindex 57fcb39..54f14db 100644[m
+[1m--- a/modules/configuracion/impuestos.js[m
+[1m+++ b/modules/configuracion/impuestos.js[m
+[36m@@ -3,7 +3,7 @@[m
+ // ERP Contable Argentina - v7.16.1[m
+ [m
+ import { getDB, getTodosLosImpuestos, actualizarImpuesto, eliminarImpuestoPersonalizado, restablecerFormulasDefault } from '../db.js';[m
+[31m-import { mostrarNotificacion, escapeHtml } from '../utils.js';[m
+[32m+[m[32mimport { mostrarNotificacion, escapeHtml, confirmarAccion} from '../utils.js';[m
+ import { crearModal, cerrarModal } from './helpers.js';[m
+ [m
+ // ==================== RENDER TAB ====================[m
+[36m@@ -59,8 +59,8 @@[m [mexport function initImpuestosEvents() {[m
+         window.dispatchEvent(new Event('refreshView'));[m
+     });[m
+ [m
+[31m-    document.getElementById('btn-restablecer-impuestos')?.addEventListener('click', () => {[m
+[31m-        if (confirm('¿Restablecer impuestos a valores por defecto?')) {[m
+[32m+[m[32m    document.getElementById('btn-restablecer-impuestos')?.addEventListener('click', async () => {[m
+[32m+[m[32m        if (await confirmarAccion({ titulo: '🔄 Restablecer impuestos', mensaje: '¿Restablecer impuestos a valores por defecto?', textoConfirmar: '🔄 Sí, restablecer', icono: '🧮' })) {[m
+             restablecerFormulasDefault();[m
+             mostrarNotificacion('Impuestos restablecidos', 'success');[m
+             window.dispatchEvent(new Event('refreshView'));[m
+[36m@@ -106,8 +106,8 @@[m [mwindow.mostrarModalAgregarImpuesto = () => {[m
+ };[m
+ [m
+ // ==================== ELIMINAR IMPUESTO ====================[m
+[31m-window.eliminarImpuestoPersonalizado = (id) => {[m
+[31m-    if (!confirm('¿Eliminar este impuesto personalizado? No se podrá recuperar.')) return;[m
+[32m+[m[32mwindow.eliminarImpuestoPersonalizado = async (id) => {[m
+[32m+[m[32m    if (!(await confirmarAccion({ titulo: '🗑️ Eliminar impuesto', mensaje: '¿Eliminar este impuesto personalizado? No se podrá recuperar.', textoConfirmar: '🗑️ Sí, eliminar', icono: '🧮' }))) return;[m
+     eliminarImpuestoPersonalizado(id);[m
+     mostrarNotificacion('Impuesto eliminado', 'info');[m
+     window.dispatchEvent(new Event('refreshView'));[m
+[1mdiff --git a/modules/configuracion/productos.js b/modules/configuracion/productos.js[m
+[1mindex 6830773..3e75500 100644[m
+[1m--- a/modules/configuracion/productos.js[m
+[1m+++ b/modules/configuracion/productos.js[m
+[36m@@ -3,7 +3,7 @@[m
+ // ERP Contable Argentina - v7.16.1[m
+ [m
+ import { getDB, guardarDB } from '../db.js';[m
+[31m-import { formatNumber, mostrarNotificacion, escapeHtml, formatDate, generarId } from '../utils.js';[m
+[32m+[m[32mimport { formatNumber, mostrarNotificacion, escapeHtml, formatDate, generarId, confirmarAccion} from '../utils.js';[m
+ import { crearModal, cerrarModal } from './helpers.js';[m
+ [m
+ // ==================== RENDER TAB ====================[m
+[36m@@ -258,8 +258,8 @@[m [mwindow.editarProducto = (id) => {[m
+ };[m
+ [m
+ // ==================== ELIMINAR ====================[m
+[31m-window.eliminarProducto = (id) => {[m
+[31m-    if (!confirm('¿Eliminar este producto? Se eliminarán también sus movimientos de stock.')) return;[m
+[32m+[m[32mwindow.eliminarProducto = async (id) => {[m
+[32m+[m[32m    if (!(await confirmarAccion({ titulo: '🗑️ Eliminar producto', mensaje: '¿Eliminar este producto? Se eliminarán también sus movimientos de stock.', textoConfirmar: '🗑️ Sí, eliminar', icono: '📦' }))) return;[m
+     const db = getDB();[m
+     db.productos = db.productos.filter(p => p.id !== id);[m
+     db.movimientosStock = db.movimientosStock.filter(m => m.productoId !== id);[m
+[1mdiff --git a/modules/configuracion/proveedores.js b/modules/configuracion/proveedores.js[m
+[1mindex 72dc0f2..94cfdf5 100644[m
+[1m--- a/modules/configuracion/proveedores.js[m
+[1m+++ b/modules/configuracion/proveedores.js[m
+[36m@@ -5,8 +5,7 @@[m
+ import { getDB, guardarDB } from '../db.js';[m
+ import {[m
+     formatNumber, mostrarNotificacion, escapeHtml, formatDate, generarId,[m
+[31m-    calcularSaldoProveedor, obtenerComprasPendientesProveedor, obtenerTotalComprasProveedor[m
+[31m-} from '../utils.js';[m
+[32m+[m[32m    calcularSaldoProveedor, obtenerComprasPendientesProveedor, obtenerTotalComprasProveedor, confirmarAccion} from '../utils.js';[m
+ import {[m
+     crearModal,[m
+     cerrarModal,[m
+[36m@@ -214,8 +213,8 @@[m [mwindow.editarProveedor = (id) => {[m
+ };[m
+ [m
+ // ==================== ELIMINAR ====================[m
+[31m-window.eliminarProveedor = (id) => {[m
+[31m-    if (!confirm('¿Eliminar este proveedor? No se podrá recuperar.')) return;[m
+[32m+[m[32mwindow.eliminarProveedor = async (id) => {[m
+[32m+[m[32m    if (!(await confirmarAccion({ titulo: '🗑️ Eliminar proveedor', mensaje: '¿Eliminar este proveedor? No se podrá recuperar.', textoConfirmar: '🗑️ Sí, eliminar', icono: '🏢' }))) return;[m
+     const db = getDB();[m
+     db.proveedores = db.proveedores.filter(p => p.id !== id);[m
+     guardarDB();[m
+[1mdiff --git a/modules/dashboard.js b/modules/dashboard.js[m
+[1mindex d5ca84b..1bafefc 100644[m
+[1m--- a/modules/dashboard.js[m
+[1m+++ b/modules/dashboard.js[m
+[36m@@ -6,7 +6,8 @@[m
+ import {[m
+     getDB, getImpuestosActivos, guardarDB,[m
+     calcularCajaReal, calcularImpuestoChequeMes, calcularIVAMes,[m
+[31m-    calcularImpuestoChequeAnual[m
+[32m+[m[32m    calcularImpuestoChequeAnual,[m
+[32m+[m[32m    getCierreAnual, guardarCierreAnual, obtenerSaldosArrastrados[m
+ } from './db.js';[m
+ import {[m
+     formatNumber, mostrarNotificacion, formatDate, escapeHtml,[m
+[36m@@ -517,6 +518,8 @@[m [mfunction renderAnioFiscal() {[m
+ [m
+     return `[m
+         <div class="space-y-4 pb-6">[m
+[32m+[m[32m            <!-- 🔥 v7.22.35: banner de estado del año (cerrado/abierto + saldos arrastrados) -->[m
+[32m+[m[32m            ${window.renderBannerEstadoAnio(anioActual)}[m
+             <!-- VENTAS Y COMPRAS -->[m
+             <div class="bg-white dark:bg-gray-800 rounded-2xl shadow overflow-hidden">[m
+                 <div class="bg-gradient-to-r from-green-500 to-teal-600 px-4 py-2 font-bold text-white">[m
+[36m@@ -1061,6 +1064,75 @@[m [mwindow.exportarResumenAnualCSV = () => {[m
+     mostrarNotificacion('📥 Resumen anual exportado', 'success');[m
+ };[m
+ [m
+[32m+[m
+[32m+[m[32m// ==================== 🔥 v7.22.35: CALCULAR SNAPSHOT ANUAL ====================[m
+[32m+[m
+[32m+[m[32m/**[m
+[32m+[m[32m * Calcula todos los valores del año fiscal para guardar en el cierre.[m
+[32m+[m[32m * @param {string|number} anio - Año fiscal (ej: 2026)[m
+[32m+[m[32m * @returns {object} - Snapshot con todos los cálculos del año[m
+[32m+[m[32m */[m
+[32m+[m[32mfunction calcularSnapshotAnual(anio) {[m
+[32m+[m[32m    const db = getDB();[m
+[32m+[m[32m    const anioStr = String(anio);[m
+[32m+[m[32m    const ventasAnio = (db.ventas || []).filter(v => (v.fechaVenta || v.fecha || '').startsWith(anioStr));[m
+[32m+[m[32m    const comprasAnio = (db.compras || []).filter(c => (c.fechaEmision || c.fecha || '').startsWith(anioStr));[m
+[32m+[m[32m    const movsAnio = (db.movimientos || []).filter(m => (m.fecha || '').startsWith(anioStr));[m
+[32m+[m[41m    [m
+[32m+[m[32m    // Ventas[m
+[32m+[m[32m    const ventasBrutas = ventasAnio.reduce((s, v) => s + (v.total || 0), 0);[m
+[32m+[m[32m    const ventasNetas = +(ventasBrutas / 1.21).toFixed(2);[m
+[32m+[m[41m    [m
+[32m+[m[32m    // Compras por tipo[m
+[32m+[m[32m    const comprasA = comprasAnio.filter(c => c.tipoFactura === 'A');[m
+[32m+[m[32m    const comprasB = comprasAnio.filter(c => c.tipoFactura === 'B');[m
+[32m+[m[32m    const comprasC = comprasAnio.filter(c => c.tipoFactura === 'C' || c.tipoFactura === 'SIN');[m
+[32m+[m[41m    [m
+[32m+[m[32m    const facturaA = comprasA.reduce((s, c) => s + (c.total || 0), 0);[m
+[32m+[m[32m    const facturaB = comprasB.reduce((s, c) => s + (c.total || 0), 0);[m
+[32m+[m[32m    const facturaC = comprasC.reduce((s, c) => s + (c.total || 0), 0);[m
+[32m+[m[41m    [m
+[32m+[m[32m    // IVA[m
+[32m+[m[32m    const ivaVentas = +(ventasBrutas - ventasNetas).toFixed(2);[m
+[32m+[m[32m    const ivaCompras = +(facturaA - (facturaA / 1.21)).toFixed(2);[m
+[32m+[m[32m    const ivaAPagar = +(ivaVentas - ivaCompras).toFixed(2);[m
+[32m+[m[32m    const saldoTecnico = ivaAPagar < 0 ? Math.abs(ivaAPagar) : 0;[m
+[32m+[m[41m    [m
+[32m+[m[32m    // Impuesto al Cheque[m
+[32m+[m[32m    const impDebitos = movsAnio.filter(m => m.tipo === 'egreso' && m.impuestoDebitoCredito?.aplica)[m
+[32m+[m[32m        .reduce((s, m) => s + (m.impuestoDebitoCredito?.monto || 0), 0);[m
+[32m+[m[32m    const impCreditos = movsAnio.filter(m => m.tipo === 'ingreso' && m.impuestoDebitoCredito?.aplica)[m
+[32m+[m[32m        .reduce((s, m) => s + (m.impuestoDebitoCredito?.monto || 0), 0);[m
+[32m+[m[32m    const impTotal = +(impDebitos + impCreditos).toFixed(2);[m
+[32m+[m[41m    [m
+[32m+[m[32m    // IIBB + TISSH[m
+[32m+[m[32m    const iibb = +(ventasNetas * 0.036).toFixed(2);[m
+[32m+[m[32m    const tissh = +(ventasNetas * 0.005).toFixed(2);[m
+[32m+[m[41m    [m
+[32m+[m[32m    // Ganancias[m
+[32m+[m[32m    const costoGanancias = facturaA - ivaCompras + facturaB + facturaC;[m
+[32m+[m[32m    const aranceles = 0;[m
+[32m+[m[32m    const utilidadAntes = +(ventasNetas - costoGanancias - aranceles - iibb - tissh - impTotal).toFixed(2);[m
+[32m+[m[32m    const ganancias = +(utilidadAntes * 0.25).toFixed(2);[m
+[32m+[m[32m    const reservaLegal = +(utilidadAntes * 0.05).toFixed(2);[m
+[32m+[m[32m    const gananciaNeta = +(utilidadAntes - ganancias - reservaLegal).toFixed(2);[m
+[32m+[m[41m    [m
+[32m+[m[32m    // Impuesto a las Ganancias a pagar (con descuento de impuesto al cheque)[m
+[32m+[m[32m    const impuestoGananciasAPagar = +(ganancias - impTotal).toFixed(2);[m
+[32m+[m[41m    [m
+[32m+[m[32m    return {[m
+[32m+[m[32m        anio: anioStr,[m
+[32m+[m[32m        fechaCierre: hoyISO(),[m
+[32m+[m[32m        ventas: { brutas: ventasBrutas, netas: ventasNetas, cantidad: ventasAnio.length },[m
+[32m+[m[32m        compras: { facturaA, facturaB, facturaC, total: +(facturaA + facturaB + facturaC).toFixed(2), costoGanancias: +costoGanancias.toFixed(2) },[m
+[32m+[m[32m        iva: { ivaVentas, ivaCompras, ivaAPagar, saldoTecnico },[m
+[32m+[m[32m        impuestoCheque: { debitos: +impDebitos.toFixed(2), creditos: +impCreditos.toFixed(2), total: impTotal },[m
+[32m+[m[32m        iibb, tissh,[m
+[32m+[m[32m        ganancias: { utilidadAntes, ganancias, reservaLegal, gananciaNeta },[m
+[32m+[m[32m        impuestoGananciasAPagar[m
+[32m+[m[32m    };[m
+[32m+[m[32m}[m
+[32m+[m
+ // ==================== 🔥 v7.17.3: FUNCIONES DE COSTOS FIJOS DESDE DASHBOARD ====================[m
+ [m
+ // Redirige a Configuración → Costos Fijos y abre el modal de edición[m
+[36m@@ -1129,3 +1201,248 @@[m [mwindow.recargarCostoFijo = (costoId) => {[m
+     mostrarNotificacion(`✅ Costo fijo recargado: ${costo.nombre} - $${formatNumber(monto)}`, 'success');[m
+     window.dispatchEvent(new Event('refreshView'));[m
+ };[m
+[32m+[m
+[32m+[m[32m// ==================== 🔥 v7.22.35: CIERRE ANUAL ====================[m
+[32m+[m
+[32m+[m[32m/**[m
+[32m+[m[32m * Cierra el año fiscal: toma snapshot, guarda en db.cierresAnuales[] y genera PDF.[m
+[32m+[m[32m */[m
+[32m+[m[32mwindow.cerrarAnioFiscal = async (anio) => {[m
+[32m+[m[32m    const db = getDB();[m
+[32m+[m[32m    const anioStr = String(anio);[m
+[32m+[m[32m    const ventasAnio = (db.ventas || []).filter(v => (v.fechaVenta || v.fecha || '').startsWith(anioStr));[m
+[32m+[m[41m    [m
+[32m+[m[32m    if (ventasAnio.length === 0) {[m
+[32m+[m[32m        mostrarNotificacion(`No hay datos del año ${anioStr} para cerrar`, 'warning');[m
+[32m+[m[32m        return;[m
+[32m+[m[32m    }[m
+[32m+[m[41m    [m
+[32m+[m[32m    const confirmado = await confirmarAccion({[m
+[32m+[m[32m        titulo: `🔒 Cerrar Año Fiscal ${anioStr}`,[m
+[32m+[m[32m        mensaje: `Se va a generar un <strong>snapshot</strong> de todos los cálculos del año ${anioStr} y se va a guardar como cierre anual.<br><br>` +[m
+[32m+[m[32m            `<strong>Ventas del año:</strong> ${ventasAnio.length}<br><br>` +[m
+[32m+[m[32m            `Los datos <strong>NO se borran</strong>. Podés seguir consultándolos, pero queda registrado el cierre.`,[m
+[32m+[m[32m        textoConfirmar: `🔒 Sí, cerrar ${anioStr}`,[m
+[32m+[m[32m        icono: '🔒'[m
+[32m+[m[32m    });[m
+[32m+[m[32m    if (!confirmado) return;[m
+[32m+[m[41m    [m
+[32m+[m[32m    try {[m
+[32m+[m[32m        const snapshot = calcularSnapshotAnual(anioStr);[m
+[32m+[m[32m        guardarCierreAnual(anioStr, snapshot);[m
+[32m+[m[32m        mostrarNotificacion(`🔒 Año ${anioStr} cerrado correctamente`, 'success');[m
+[32m+[m[41m        [m
+[32m+[m[32m        // Generar PDF automáticamente[m
+[32m+[m[32m        window.descargarPDFCierreAnual(anioStr);[m
+[32m+[m[41m        [m
+[32m+[m[32m        window.dispatchEvent(new Event('refreshView'));[m
+[32m+[m[32m    } catch (err) {[m
+[32m+[m[32m        console.error('Error al cerrar año:', err);[m
+[32m+[m[32m        mostrarNotificacion('Error al cerrar año: ' + err.message, 'error');[m
+[32m+[m[32m    }[m
+[32m+[m[32m};[m
+[32m+[m
+[32m+[m[32m/**[m
+[32m+[m[32m * Reabre el año fiscal: elimina el cierre anual (con confirmación doble).[m
+[32m+[m[32m */[m
+[32m+[m[32mwindow.reabrirAnioFiscal = async (anio) => {[m
+[32m+[m[32m    const anioStr = String(anio);[m
+[32m+[m[32m    const cierre = getCierreAnual(anioStr);[m
+[32m+[m[32m    if (!cierre) {[m
+[32m+[m[32m        mostrarNotificacion(`El año ${anioStr} no está cerrado`, 'warning');[m
+[32m+[m[32m        return;[m
+[32m+[m[32m    }[m
+[32m+[m[41m    [m
+[32m+[m[32m    const confirmado1 = await confirmarAccion({[m
+[32m+[m[32m        titulo: `🔓 Reabrir Año Fiscal ${anioStr} - Confirmación 1`,[m
+[32m+[m[32m        mensaje: `El año ${anioStr} fue cerrado el <strong>${formatDate(cierre.fechaCierre)}</strong>.<br><br>` +[m
+[32m+[m[32m            `Al reabrirlo, se <strong>elimina el snapshot</strong> del cierre anual.<br><br>` +[m
+[32m+[m[32m            `¿Continuar?`,[m
+[32m+[m[32m        textoConfirmar: '🔓 Sí, continuar',[m
+[32m+[m[32m        icono: '🔓'[m
+[32m+[m[32m    });[m
+[32m+[m[32m    if (!confirmado1) return;[m
+[32m+[m[41m    [m
+[32m+[m[32m    const confirmado2 = await confirmarAccion({[m
+[32m+[m[32m        titulo: '🚨 CONFIRMACIÓN FINAL',[m
+[32m+[m[32m        mensaje: `Se va a eliminar el cierre del año ${anioStr}.<br><br><strong>¿Estás 100% seguro?</strong>`,[m
+[32m+[m[32m        textoConfirmar: '🚨 SÍ, REABRIR',[m
+[32m+[m[32m        icono: '🚨'[m
+[32m+[m[32m    });[m
+[32m+[m[32m    if (!confirmado2) return;[m
+[32m+[m[41m    [m
+[32m+[m[32m    const db = getDB();[m
+[32m+[m[32m    db.cierresAnuales = (db.cierresAnuales || []).filter(c => String(c.anio) !== anioStr);[m
+[32m+[m[32m    guardarDB();[m
+[32m+[m[32m    mostrarNotificacion(`🔓 Año ${anioStr} reabierto`, 'success');[m
+[32m+[m[32m    window.dispatchEvent(new Event('refreshView'));[m
+[32m+[m[32m};[m
+[32m+[m
+[32m+[m[32m/**[m
+[32m+[m[32m * Genera y descarga el PDF del cierre anual.[m
+[32m+[m[32m */[m
+[32m+[m[32mwindow.descargarPDFCierreAnual = (anio) => {[m
+[32m+[m[32m    const anioStr = String(anio);[m
+[32m+[m[32m    const cierre = getCierreAnual(anioStr);[m
+[32m+[m[32m    if (!cierre) {[m
+[32m+[m[32m        mostrarNotificacion(`El año ${anioStr} no está cerrado`, 'warning');[m
+[32m+[m[32m        return;[m
+[32m+[m[32m    }[m
+[32m+[m[41m    [m
+[32m+[m[32m    const s = cierre.snapshot;[m
+[32m+[m[32m    const empresa = getDB().datosEmpresa || {};[m
+[32m+[m[41m    [m
+[32m+[m[32m    const html = `<!DOCTYPE html>[m
+[32m+[m[32m<html lang="es">[m
+[32m+[m[32m<head>[m
+[32m+[m[32m<meta charset="UTF-8">[m
+[32m+[m[32m<title>Cierre Anual ${anioStr}</title>[m
+[32m+[m[32m<style>[m
+[32m+[m[32mbody { font-family: Arial, sans-serif; padding: 40px; color: #333; }[m
+[32m+[m[32mh1 { border-bottom: 3px solid #2563eb; padding-bottom: 10px; }[m
+[32m+[m[32mh2 { color: #2563eb; margin-top: 30px; border-bottom: 1px solid #ccc; padding-bottom: 5px; }[m
+[32m+[m[32mtable { width: 100%; border-collapse: collapse; margin: 15px 0; }[m
+[32m+[m[32mth, td { padding: 8px; text-align: left; border-bottom: 1px solid #ddd; }[m
+[32m+[m[32mth { background: #f3f4f6; font-weight: bold; }[m
+[32m+[m[32m.total { font-weight: bold; background: #f9fafb; }[m
+[32m+[m[32m.destacado { font-size: 1.3em; color: #059669; font-weight: bold; }[m
+[32m+[m[32m.firma { margin-top: 60px; border-top: 1px solid #333; width: 300px; padding-top: 10px; }[m
+[32m+[m[32m.header { display: flex; justify-content: space-between; margin-bottom: 20px; }[m
+[32m+[m[32m</style>[m
+[32m+[m[32m</head>[m
+[32m+[m[32m<body>[m
+[32m+[m[32m<div class="header">[m
+[32m+[m[32m    <div>[m
+[32m+[m[32m        <h1>${empresa.nombre || 'ERP Contable'}</h1>[m
+[32m+[m[32m        <p>CUIT: ${empresa.cuit || '-'}</p>[m
+[32m+[m[32m        <p>Condición IVA: ${empresa.condicionIVA || '-'}</p>[m
+[32m+[m[32m    </div>[m
+[32m+[m[32m    <div style="text-align: right;">[m
+[32m+[m[32m        <p><strong>Cierre Anual ${anioStr}</strong></p>[m
+[32m+[m[32m        <p>Fecha de cierre: ${formatDate(cierre.fechaCierre)}</p>[m
+[32m+[m[32m    </div>[m
+[32m+[m[32m</div>[m
+[32m+[m
+[32m+[m[32m<h2>📊 Resumen Ejecutivo</h2>[m
+[32m+[m[32m<table>[m
+[32m+[m[32m<tr><th>Concepto</th><th>Monto</th></tr>[m
+[32m+[m[32m<tr><td>Ventas brutas (con IVA)</td><td>$${formatNumber(s.ventas.brutas)}</td></tr>[m
+[32m+[m[32m<tr><td>Ventas netas (sin IVA)</td><td>$${formatNumber(s.ventas.netas)}</td></tr>[m
+[32m+[m[32m<tr><td>Cantidad de facturas</td><td>${s.ventas.cantidad}</td></tr>[m
+[32m+[m[32m<tr class="total"><td>Ganancia neta del año</td><td class="destacado">$${formatNumber(s.ganancias.gananciaNeta)}</td></tr>[m
+[32m+[m[32m</table>[m
+[32m+[m
+[32m+[m[32m<h2>🛒 Compras por tipo de factura</h2>[m
+[32m+[m[32m<table>[m
+[32m+[m[32m<tr><th>Tipo</th><th>Monto</th></tr>[m
+[32m+[m[32m<tr><td>Factura A</td><td>$${formatNumber(s.compras.facturaA)}</td></tr>[m
+[32m+[m[32m<tr><td>Factura B</td><td>$${formatNumber(s.compras.facturaB)}</td></tr>[m
+[32m+[m[32m<tr><td>Factura C (deducible)</td><td>$${formatNumber(s.compras.facturaC)}</td></tr>[m
+[32m+[m[32m<tr class="total"><td>Costo total Ganancias</td><td>$${formatNumber(s.compras.costoGanancias)}</td></tr>[m
+[32m+[m[32m</table>[m
+[32m+[m
+[32m+[m[32m<h2>🧾 IVA del Año</h2>[m
+[32m+[m[32m<table>[m
+[32m+[m[32m<tr><th>Concepto</th><th>Monto</th></tr>[m
+[32m+[m[32m<tr><td>IVA Ventas (débito fiscal)</td><td>+$${formatNumber(s.iva.ivaVentas)}</td></tr>[m
+[32m+[m[32m<tr><td>IVA Compras (crédito fiscal)</td><td>-$${formatNumber(s.iva.ivaCompras)}</td></tr>[m
+[32m+[m[32m<tr class="total"><td>IVA a pagar</td><td>$${formatNumber(s.iva.ivaAPagar)}</td></tr>[m
+[32m+[m[32m${s.iva.saldoTecnico > 0 ? `<tr><td>Saldo técnico a favor</td><td class="destacado">$${formatNumber(s.iva.saldoTecnico)}</td></tr>` : ''}[m
+[32m+[m[32m</table>[m
+[32m+[m
+[32m+[m[32m<h2>🏦 Impuesto al Cheque</h2>[m
+[32m+[m[32m<table>[m
+[32m+[m[32m<tr><th>Concepto</th><th>Monto</th></tr>[m
+[32m+[m[32m<tr><td>Débitos (pagos)</td><td>$${formatNumber(s.impuestoCheque.debitos)}</td></tr>[m
+[32m+[m[32m<tr><td>Créditos (cobros)</td><td>$${formatNumber(s.impuestoCheque.creditos)}</td></tr>[m
+[32m+[m[32m<tr class="total"><td>Total pagado a cuenta</td><td>$${formatNumber(s.impuestoCheque.total)}</td></tr>[m
+[32m+[m[32m</table>[m
+[32m+[m
+[32m+[m[32m<h2>📊 Resultado del Año</h2>[m
+[32m+[m[32m<table>[m
+[32m+[m[32m<tr><th>Concepto</th><th>Monto</th></tr>[m
+[32m+[m[32m<tr><td>Ventas netas</td><td>$${formatNumber(s.ventas.netas)}</td></tr>[m
+[32m+[m[32m<tr><td>− Costos (todas las facturas)</td><td>-$${formatNumber(s.compras.costoGanancias)}</td></tr>[m
+[32m+[m[32m<tr><td>− IIBB</td><td>-$${formatNumber(s.iibb)}</td></tr>[m
+[32m+[m[32m<tr><td>− TISSH</td><td>-$${formatNumber(s.tissh)}</td></tr>[m
+[32m+[m[32m<tr><td>− Impuesto al cheque</td><td>-$${formatNumber(s.impuestoCheque.total)}</td></tr>[m
+[32m+[m[32m<tr class="total"><td>= Utilidad antes de Ganancias</td><td>$${formatNumber(s.ganancias.utilidadAntes)}</td></tr>[m
+[32m+[m[32m<tr><td>− Ganancias (25%)</td><td>-$${formatNumber(s.ganancias.ganancias)}</td></tr>[m
+[32m+[m[32m<tr><td>− Reserva Legal SAS (5%)</td><td>-$${formatNumber(s.ganancias.reservaLegal)}</td></tr>[m
+[32m+[m[32m<tr class="total"><td>💰 GANANCIA NETA DEL AÑO</td><td class="destacado">$${formatNumber(s.ganancias.gananciaNeta)}</td></tr>[m
+[32m+[m[32m</table>[m
+[32m+[m
+[32m+[m[32m<h2>💵 Impuesto a las Ganancias a Pagar</h2>[m
+[32m+[m[32m<table>[m
+[32m+[m[32m<tr><th>Concepto</th><th>Monto</th></tr>[m
+[32m+[m[32m<tr><td>Ganancias calculadas (25%)</td><td>$${formatNumber(s.ganancias.ganancias)}</td></tr>[m
+[32m+[m[32m<tr><td>− Impuesto al cheque pagado a cuenta</td><td>-$${formatNumber(s.impuestoCheque.total)}</td></tr>[m
+[32m+[m[32m<tr class="total"><td>A PAGAR</td><td class="destacado">$${formatNumber(s.impuestoGananciasAPagar)}</td></tr>[m
+[32m+[m[32m</table>[m
+[32m+[m
+[32m+[m[32m<div class="firma">[m
+[32m+[m[32m    <p>Firma del contador</p>[m
+[32m+[m[32m    <p style="font-size: 0.8em; color: #666;">Cierre generado el ${formatDate(hoyISO())}</p>[m
+[32m+[m[32m</div>[m
+[32m+[m
+[32m+[m[32m</body>[m
+[32m+[m[32m</html>`;[m
+[32m+[m[41m    [m
+[32m+[m[32m    // Abrir en nueva ventana para imprimir/guardar como PDF[m
+[32m+[m[32m    const ventana = window.open('', '_blank');[m
+[32m+[m[32m    ventana.document.write(html);[m
+[32m+[m[32m    ventana.document.close();[m
+[32m+[m[32m    setTimeout(() => ventana.print(), 500);[m
+[32m+[m[32m};[m
+[32m+[m
+[32m+[m[32m// ==================== 🔥 v7.22.35: BANNER DE ESTADO DEL AÑO ====================[m
+[32m+[m
+[32m+[m[32m/**[m
+[32m+[m[32m * Genera el HTML del banner de estado del año (cerrado/abierto).[m
+[32m+[m[32m */[m
+[32m+[m[32mwindow.renderBannerEstadoAnio = (anio) => {[m
+[32m+[m[32m    const anioStr = String(anio);[m
+[32m+[m[32m    const cierre = getCierreAnual(anioStr);[m
+[32m+[m[41m    [m
+[32m+[m[32m    if (cierre) {[m
+[32m+[m[32m        return `[m
+[32m+[m[32m            <div class="bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-500 rounded-2xl p-4 mb-4">[m
+[32m+[m[32m                <div class="flex justify-between items-center flex-wrap gap-3">[m
+[32m+[m[32m                    <div>[m
+[32m+[m[32m                        <p class="font-bold text-blue-800 dark:text-blue-200">🔒 Año ${anioStr} cerrado</p>[m
+[32m+[m[32m                        <p class="text-sm text-blue-600 dark:text-blue-300">Cerrado el ${formatDate(cierre.fechaCierre)}</p>[m
+[32m+[m[32m                    </div>[m
+[32m+[m[32m                    <div class="flex gap-2 flex-wrap">[m
+[32m+[m[32m                        <button onclick="window.descargarPDFCierreAnual(${anioStr})" class="bg-blue-600 text-white px-3 py-1 rounded-xl text-sm">📄 Descargar PDF</button>[m
+[32m+[m[32m                        <button onclick="window.reabrirAnioFiscal(${anioStr})" class="bg-orange-600 text-white px-3 py-1 rounded-xl text-sm">🔓 Reabrir año</button>[m
+[32m+[m[32m                    </div>[m
+[32m+[m[32m                </div>[m
+[32m+[m[32m            </div>[m
+[32m+[m[32m        `;[m
+[32m+[m[32m    }[m
+[32m+[m[41m    [m
+[32m+[m[32m    // Verificar si hay saldos arrastrados del año anterior[m
+[32m+[m[32m    const saldos = obtenerSaldosArrastrados(anioStr);[m
+[32m+[m[32m    const bannerSaldos = saldos ? `[m
+[32m+[m[32m        <div class="bg-green-50 dark:bg-green-900/20 border-l-4 border-green-500 rounded-2xl p-4 mb-4">[m
+[32m+[m[32m            <p class="font-bold text-green-800 dark:text-green-200">📊 Saldos arrastrados del año ${saldos.anioOrigen}</p>[m
+[32m+[m[32m            <p class="text-sm text-green-600 dark:text-green-300">[m
+[32m+[m[32m                ${saldos.ivaAFavor > 0 ? `• IVA a favor: $${formatNumber(saldos.ivaAFavor)}<br>` : ''}[m
+[32m+[m[32m                ${saldos.impuestoChequeAcumulado > 0 ? `• Impuesto al Cheque acumulado: $${formatNumber(saldos.impuestoChequeAcumulado)}<br>` : ''}[m
+[32m+[m[32m            </p>[m
+[32m+[m[32m        </div>[m
+[32m+[m[32m    ` : '';[m
+[32m+[m[41m    [m
+[32m+[m[32m    return `[m
+[32m+[m[32m        ${bannerSaldos}[m
+[32m+[m[32m        <div class="bg-yellow-50 dark:bg-yellow-900/20 border-l-4 border-yellow-500 rounded-2xl p-4 mb-4">[m
+[32m+[m[32m            <div class="flex justify-between items-center flex-wrap gap-3">[m
+[32m+[m[32m                <div>[m
+[32m+[m[32m                    <p class="font-bold text-yellow-800 dark:text-yellow-200">🔓 Año ${anioStr} abierto</p>[m
+[32m+[m[32m                    <p class="text-sm text-yellow-600 dark:text-yellow-300">Podés cerrar el año para guardar un snapshot de todos los cálculos.</p>[m
+[32m+[m[32m                </div>[m
+[32m+[m[32m                <button onclick="window.cerrarAnioFiscal(${anioStr})" class="bg-yellow-600 text-white px-3 py-1 rounded-xl text-sm">🔒 Cerrar Año ${anioStr}</button>[m
+[32m+[m[32m            </div>[m
+[32m+[m[32m        </div>[m
+[32m+[m[32m    `;[m
+[32m+[m[32m};[m
+[1mdiff --git a/modules/db.js b/modules/db.js[m
+[1mindex 2b07806..e534deb 100644[m
+[1m--- a/modules/db.js[m
+[1m+++ b/modules/db.js[m
+[36m@@ -105,7 +105,9 @@[m [mlet db = {[m
+             otros: 0[m
+         }[m
+     },[m
+[31m-    cierresMensuales: [][m
+[32m+[m[32m    cierresMensuales: [],[m
+[32m+[m[32m    // 🔥 v7.22.35: cierres anuales (snapshot del año fiscal)[m
+[32m+[m[32m    cierresAnuales: [][m
+ };[m
+ [m
+ // ==================== SINCRONIZACIÓN ====================[m
+[36m@@ -285,6 +287,8 @@[m [mexport async function cargarDB() {[m
+     if (!db.impuestosPersonalizados) db.impuestosPersonalizados = [];[m
+     if (!db.historialTesoreria) db.historialTesoreria = [];[m
+     if (!db.cierresMensuales) db.cierresMensuales = [];[m
+[32m+[m[32m    if (!db.cierresAnuales) db.cierresAnuales = [];[m
+[32m+[m[32m    if (!db.cierresAnuales) db.cierresAnuales = [];[m
+     if (!db.aportesCapital) db.aportesCapital = [];[m
+     if (!db.productos) db.productos = [];[m
+     if (!db.movimientosStock) db.movimientosStock = [];[m
+[36m@@ -935,7 +939,52 @@[m [mexport function guardarSnapshotTesoreria(snapshot) {[m
+ [m
+ export function obtenerHistorialTesoreria() {[m
+     const dbActual = getDB();[m
+[31m-    return dbActual.historialTesoreria || [];[m
+[32m+[m[32m    const hoy = new Date();[m
+[32m+[m[32m    const mesActual = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}`;[m
+[32m+[m[41m    [m
+[32m+[m[32m    // 🔥 v7.24.14: Para el mes actual, calcular en vivo (no usar snapshot)[m
+[32m+[m[32m    const snapshotMesActual = (dbActual.historialTesoreria || []).find(h => h.mes === mesActual);[m
+[32m+[m[41m    [m
+[32m+[m[32m    // Calcular datos en vivo del mes actual[m
+[32m+[m[32m    const movsMes = (dbActual.movimientos || []).filter(m => m.mes === mesActual);[m
+[32m+[m[32m    const ingresos = movsMes.filter(m => m.tipo === 'ingreso').reduce((s, m) => s + (m.monto || 0), 0);[m
+[32m+[m[32m    const egresos = movsMes.filter(m => m.tipo === 'egreso').reduce((s, m) => s + (m.monto || 0), 0);[m
+[32m+[m[32m    const neto = ingresos - egresos;[m
+[32m+[m[41m    [m
+[32m+[m[32m    const ventasMes = (dbActual.ventas || []).filter(v => v.mes === mesActual);[m
+[32m+[m[32m    const totalCobrado = ventasMes.filter(v => v.estado === 'cobrado').reduce((s, v) => s + (v.total || 0), 0);[m
+[32m+[m[41m    [m
+[32m+[m[32m    const comprasMes = (dbActual.compras || []).filter(c => c.fechaEmision && c.fechaEmision.startsWith(mesActual));[m
+[32m+[m[32m    const totalPagado = comprasMes.filter(c => c.estadoPago === 'PAGADO').reduce((s, c) => s + (c.totalFactura || 0), 0);[m
+[32m+[m[41m    [m
+[32m+[m[32m    const ivaMes = calcularIVAMes(mesActual);[m
+[32m+[m[32m    const impChequeMes = calcularImpuestoChequeMes(mesActual);[m
+[32m+[m[41m    [m
+[32m+[m[32m    // Capital acumulado (caja inicial + neto del mes)[m
+[32m+[m[32m    const capitalAcumulado = neto; // Simplificado; si hay cierres anteriores, sumar[m
+[32m+[m[41m    [m
+[32m+[m[32m    const historialVivo = {[m
+[32m+[m[32m        mes: mesActual,[m
+[32m+[m[32m        saldoCaja: neto,[m
+[32m+[m[32m        ivaAPagar: ivaMes.ivaAPagar,[m
+[32m+[m[32m        totalCobrado: totalCobrado,[m
+[32m+[m[32m        totalPagado: totalPagado,[m
+[32m+[m[32m        capitalAcumulado: capitalAcumulado,[m
+[32m+[m[32m        ventasCount: ventasMes.length[m
+[32m+[m[32m    };[m
+[32m+[m[41m    [m
+[32m+[m[32m    // Combinar: snapshots de meses anteriores + datos vivos del mes actual[m
+[32m+[m[32m    const historial = [...(dbActual.historialTesoreria || [])];[m
+[32m+[m[41m    [m
+[32m+[m[32m    // Reemplazar o agregar el mes actual[m
+[32m+[m[32m    const idxMesActual = historial.findIndex(h => h.mes === mesActual);[m
+[32m+[m[32m    if (idxMesActual >= 0) {[m
+[32m+[m[32m        historial[idxMesActual] = historialVivo;[m
+[32m+[m[32m    } else {[m
+[32m+[m[32m        historial.push(historialVivo);[m
+[32m+[m[32m    }[m
+[32m+[m[41m    [m
+[32m+[m[32m    return historial.sort((a, b) => a.mes.localeCompare(b.mes));[m
+ }[m
+ [m
+ export function obtenerSnapshotPorMes(mes) {[m
+[36m@@ -1003,3 +1052,64 @@[m [mexport function recalcularImpuestoChequeTodos(nuevaAlicuota = 3) {[m
+     }[m
+     return { actualizados };[m
+ }[m
+[32m+[m
+[32m+[m[32m// ==================== 🔥 v7.22.35: HELPERS DE CIERRE ANUAL ====================[m
+[32m+[m
+[32m+[m[32m/**[m
+[32m+[m[32m * Devuelve el cierre anual de un año (o null si no existe).[m
+[32m+[m[32m */[m
+[32m+[m[32mexport function getCierreAnual(anio) {[m
+[32m+[m[32m    const db = getDB();[m
+[32m+[m[32m    if (!db.cierresAnuales) return null;[m
+[32m+[m[32m    return db.cierresAnuales.find(c => String(c.anio) === String(anio)) || null;[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32m/**[m
+[32m+[m[32m * Guarda (o sobreescribe) el cierre anual de un año.[m
+[32m+[m[32m * @param {string|number} anio - Año fiscal (ej: 2026)[m
+[32m+[m[32m * @param {object} snapshot - Objeto con todos los cálculos del año[m
+[32m+[m[32m */[m
+[32m+[m[32mexport function guardarCierreAnual(anio, snapshot) {[m
+[32m+[m[32m    const db = getDB();[m
+[32m+[m[32m    if (!db.cierresAnuales) db.cierresAnuales = [];[m
+[32m+[m[41m    [m
+[32m+[m[32m    const idx = db.cierresAnuales.findIndex(c => String(c.anio) === String(anio));[m
+[32m+[m[32m    const cierre = {[m
+[32m+[m[32m        anio: String(anio),[m
+[32m+[m[32m        fechaCierre: snapshot.fechaCierre || hoyISO(),[m
+[32m+[m[32m        snapshot: snapshot[m
+[32m+[m[32m    };[m
+[32m+[m[41m    [m
+[32m+[m[32m    if (idx >= 0) {[m
+[32m+[m[32m        db.cierresAnuales[idx] = cierre;[m
+[32m+[m[32m    } else {[m
+[32m+[m[32m        db.cierresAnuales.push(cierre);[m
+[32m+[m[32m    }[m
+[32m+[m[41m    [m
+[32m+[m[32m    guardarDB();[m
+[32m+[m[32m    return cierre;[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32m/**[m
+[32m+[m[32m * Lee el cierre del año anterior y devuelve los saldos a favor a arrastrar.[m
+[32m+[m[32m * @param {string|number} anio - Año actual (ej: 2027)[m
+[32m+[m[32m * @returns {object|null} - { ivaAFavor, impuestoChequeAcumulado, anioOrigen } o null[m
+[32m+[m[32m */[m
+[32m+[m[32mexport function obtenerSaldosArrastrados(anio) {[m
+[32m+[m[32m    const anioAnterior = String(Number(anio) - 1);[m
+[32m+[m[32m    const cierreAnterior = getCierreAnual(anioAnterior);[m
+[32m+[m[32m    if (!cierreAnterior) return null;[m
+[32m+[m[41m    [m
+[32m+[m[32m    const snapshot = cierreAnterior.snapshot;[m
+[32m+[m[32m    const ivaAFavor = snapshot.iva?.saldoTecnico > 0 ? snapshot.iva.saldoTecnico : 0;[m
+[32m+[m[32m    const impuestoChequeAcumulado = snapshot.impuestoCheque?.total || 0;[m
+[32m+[m[41m    [m
+[32m+[m[32m    if (ivaAFavor === 0 && impuestoChequeAcumulado === 0) return null;[m
+[32m+[m[41m    [m
+[32m+[m[32m    return {[m
+[32m+[m[32m        anioOrigen: anioAnterior,[m
+[32m+[m[32m        ivaAFavor: ivaAFavor,[m
+[32m+[m[32m        impuestoChequeAcumulado: impuestoChequeAcumulado,[m
+[32m+[m[32m        fechaCierreOrigen: cierreAnterior.fechaCierre[m
+[32m+[m[32m    };[m
+[32m+[m[32m}[m
+[1mdiff --git a/modules/firebase.js b/modules/firebase.js[m
+[1mindex 64f189f..2b0431c 100644[m
+[1m--- a/modules/firebase.js[m
+[1m+++ b/modules/firebase.js[m
+[36m@@ -383,3 +383,17 @@[m [mexport async function comprimirImagen(file, maxAncho = 1600, calidad = 0.7) {[m
+         reader.readAsDataURL(file);[m
+     });[m
+ }[m
+[32m+[m
+[32m+[m[32m// ==================== 🔥 v7.22.23: ELIMINAR ARCHIVO DE STORAGE ====================[m
+[32m+[m[32mexport async function eliminarArchivoDeStorage(url) {[m
+[32m+[m[32m    if (!url || !url.startsWith('https://firebasestorage')) return;[m
+[32m+[m[32m    if (!firebaseReady || !storage || !firebaseModules) return;[m
+[32m+[m[32m    try {[m
+[32m+[m[32m        const { ref, deleteObject } = firebaseModules.storage;[m
+[32m+[m[32m        const storageRef = ref(storage, url);[m
+[32m+[m[32m        await deleteObject(storageRef);[m
+[32m+[m[32m        console.log('🗑️ Archivo eliminado de Storage:', url.substring(0, 80) + '...');[m
+[32m+[m[32m    } catch (e) {[m
+[32m+[m[32m        console.warn('⚠️ Error eliminando archivo de Storage:', e);[m
+[32m+[m[32m    }[m
+[32m+[m[32m}[m
+[1mdiff --git a/modules/presupuestos/aprobar.js b/modules/presupuestos/aprobar.js[m
+[1mindex c77754b..0236bc3 100644[m
+[1m--- a/modules/presupuestos/aprobar.js[m
+[1m+++ b/modules/presupuestos/aprobar.js[m
+[36m@@ -20,7 +20,10 @@[m [mwindow.aprobarPresupuesto = (id) => {[m
+     // 🔥 v7.16.81: hoyISO viene de utils.js (helper local, sin bug UTC-3)[m
+     const hoyFormateada = formatDate(new Date());[m
+     const cliente = db.clientes.find(c => c.id === presupuesto.clienteId);[m
+[31m-    const diasCobro = cliente ? cliente.diasCobro : 30;[m
+[32m+[m[32m    // 🔥 v7.22.29: forzar diasCobro a mínimo 0 y máximo 365[m
+[32m+[m[32m    let diasCobro = cliente && cliente.diasCobro !== undefined && cliente.diasCobro !== null ? parseInt(cliente.diasCobro) : 30;[m
+[32m+[m[32m    if (isNaN(diasCobro) || diasCobro < 0) diasCobro = 30;[m
+[32m+[m[32m    if (diasCobro > 365) diasCobro = 365;[m
+     const fechaCobroISO = new Date();[m
+     fechaCobroISO.setDate(fechaCobroISO.getDate() + diasCobro);[m
+     const fechaCobroFormateada = formatDate(fechaCobroISO);[m
+[36m@@ -35,16 +38,22 @@[m [mwindow.aprobarPresupuesto = (id) => {[m
+                     <p><strong>Total:</strong> <span class="font-bold text-green-600">$${formatNumber(presupuesto.total)}</span></p>[m
+                 </div>[m
+                 <div class="space-y-3">[m
+[31m-                    <label class="block text-sm font-medium">📋 Número de Orden de Compra (OC)</label>[m
+[31m-                    <input type="text" id="ocClienteAprob" class="w-full p-3 border rounded-xl" placeholder="Ej: OC-2026-001">[m
+[31m-                    <label class="block text-sm font-medium">📎 Adjuntar OC (PDF/Imagen)</label>[m
+[31m-                    <div class="flex items-center gap-2">[m
+[32m+[m[32m                    <label class="block text-sm font-medium">📋 Número de Orden de Compra (OC) <span class="text-xs text-gray-400 font-normal">(opcional)</span></label>[m
+[32m+[m[32m                    <input type="text" id="ocClienteAprob" class="w-full p-3 border rounded-xl" placeholder="Ej: OC-2026-001 (dejar vacío si es pago directo)">[m
+[32m+[m[32m                    <label class="block text-sm font-medium">📎 Adjuntar OC (PDF/Imagen) <span class="text-xs text-gray-400 font-normal">(opcional)</span></label>[m
+[32m+[m[32m                    <div class="flex items-center gap-2 flex-wrap">[m
+                         <label class="cursor-pointer bg-gray-200 dark:bg-gray-700 px-4 py-2 rounded-lg text-sm hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors">[m
+                             Seleccionar archivo[m
+[31m-                            <input type="file" id="ocArchivoAprob" accept=".pdf,image/*" class="hidden" onchange="window.actualizarNombreArchivo(this, 'nombreArchivoOC')">[m
+[32m+[m[32m                            <input type="file" id="ocArchivoAprob" accept=".pdf,image/*" class="hidden" onchange="window.seleccionarOCClienteAprob(this.files[0])">[m
+                         </label>[m
+                         <span id="nombreArchivoOC" class="text-sm text-gray-500">Ningún archivo seleccionado</span>[m
+                     </div>[m
+[32m+[m[32m                    <div id="ocClientePreviewActions" class="hidden mt-2 p-2 bg-white dark:bg-gray-800 rounded border dark:border-gray-700">[m
+[32m+[m[32m                        <div class="flex flex-wrap gap-2">[m
+[32m+[m[32m                            <button type="button" onclick="window.verOCClienteAprob()" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-xs">👁️ Ver vista previa</button>[m
+[32m+[m[32m                            <button type="button" onclick="window.quitarOCClienteAprob()" class="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-xs">🗑️ Quitar</button>[m
+[32m+[m[32m                        </div>[m
+[32m+[m[32m                    </div>[m
+                     <label class="block text-sm font-medium">📅 Fecha de recepción de OC</label>[m
+                     <div class="flex items-center gap-2">[m
+                         <input type="text" id="fechaRecepcionText" class="flex-1 p-3 border rounded-xl" placeholder="DD/MM/AAAA" value="${hoyFormateada}">[m
+[36m@@ -109,7 +118,7 @@[m [mwindow.aprobarPresupuesto = (id) => {[m
+         const observaciones = document.getElementById('observacionesAprob').value.trim();[m
+         const archivoOC = document.getElementById('ocArchivoAprob').files[0];[m
+ [m
+[31m-        if (!oc) { mostrarNotificacion('Ingrese número de OC', 'warning'); return; }[m
+[32m+[m[32m        // 🔥 v7.22.24: el número de OC es opcional (pagos directos sin OC)[m
+         if (!fechaCobro) { mostrarNotificacion('Fecha de cobro esperada requerida', 'warning'); return; }[m
+ [m
+         const ventaNeta = presupuesto.ventaCliente !== undefined [m
+[36m@@ -123,6 +132,9 @@[m [mwindow.aprobarPresupuesto = (id) => {[m
+             id: generarId(),[m
+             clienteId: presupuesto.clienteId,[m
+             clienteNombre: presupuesto.cliente,[m
+[32m+[m[32m            patente: presupuesto.patente || '',[m
+[32m+[m[32m            vehiculoMarca: presupuesto.vehiculoMarca || '',[m
+[32m+[m[32m            vehiculoKm: presupuesto.vehiculoKm || '',[m
+             tipoComprobante: 'Factura A',[m
+             numComprobante: numFactura || null,[m
+             montoNeto: ventaNeta,[m
+[36m@@ -130,6 +142,7 @@[m [mwindow.aprobarPresupuesto = (id) => {[m
+             ivaMonto: ivaMontoVenta,[m
+             total: presupuesto.total,[m
+             fechaVenta: hoyISO(),[m
+[32m+[m[32m            fechaAprobacion: hoyISO(),  // 🔥 v7.22.20: fecha de aprobación[m
+             fechaCobroEsperada: fechaCobro,[m
+             mes: hoyISO().substring(0, 7),[m
+             estado: numFactura ? 'pendiente_cobro' : 'pendiente_factura',[m
+[36m@@ -163,19 +176,30 @@[m [mwindow.aprobarPresupuesto = (id) => {[m
+             fechaFactura: null,[m
+             numFacturaEmitida: numFactura || null,[m
+             facturaEmitidaUrl: null,[m
+[31m-            diasCobroCliente: cliente ? cliente.diasCobro : 30,[m
+[32m+[m[32m            diasCobroCliente: diasCobro,[m
+             presupuestoMoraGenerado: null,[m
+             moraSaldada: false[m
+         };[m
+ [m
+[32m+[m[32m        // 🔥 v7.22.16: subir OC del cliente a Storage (no base64)[m
+         if (archivoOC) {[m
+[31m-            const reader = new FileReader();[m
+[31m-            reader.onload = (e) => {[m
+[31m-                nuevaVenta.ocArchivoUrl = e.target.result;[m
+[31m-                nuevaVenta.ocArchivoNombre = archivoOC.name;[m
+[32m+[m[32m            (async () => {[m
+[32m+[m[32m                try {[m
+[32m+[m[32m                    const { subirArchivo, comprimirImagen, getEmpresaActual } = await import('../firebase.js');[m
+[32m+[m[32m                    const fileComprimido = await comprimirImagen(archivoOC);[m
+[32m+[m[32m                    const ext = (fileComprimido.name.split('.').pop() || 'bin').toLowerCase();[m
+[32m+[m[32m                    const empresaId = getEmpresaActual() || 'empresa_principal';[m
+[32m+[m[32m                    const ruta = `${empresaId}/presupuestos/oc_cliente_${Date.now()}.${ext}`;[m
+[32m+[m[32m                    const url = await subirArchivo(ruta, fileComprimido);[m
+[32m+[m[32m                    nuevaVenta.ocArchivoUrl = url;[m
+[32m+[m[32m                    nuevaVenta.ocArchivoNombre = fileComprimido.name;[m
+[32m+[m[32m                    console.log('✅ OC del cliente subida a Storage:', url.substring(0, 80) + '...');[m
+[32m+[m[32m                } catch (e) {[m
+[32m+[m[32m                    console.error('❌ Error subiendo OC:', e);[m
+[32m+[m[32m                    mostrarNotificacion('Error subiendo OC: ' + e.message, 'error');[m
+[32m+[m[32m                }[m
+                 guardarVentaCompleta(nuevaVenta, presupuesto);[m
+[31m-            };[m
+[31m-            reader.readAsDataURL(archivoOC);[m
+[32m+[m[32m            })();[m
+         } else {[m
+             guardarVentaCompleta(nuevaVenta, presupuesto);[m
+         }[m
+[36m@@ -193,6 +217,12 @@[m [mfunction guardarVentaCompleta(nuevaVenta, presupuesto) {[m
+     if (presIndex !== -1) {[m
+         db.presupuestos[presIndex].estado = 'aprobado';[m
+         db.presupuestos[presIndex].ventaGeneradaId = nuevaVenta.id;[m
+[32m+[m[32m        db.presupuestos[presIndex].fechaAprobacion = hoyISO();[m
+[32m+[m[32m        // 🔥 v7.22.16: guardar OC del cliente en el presupuesto[m
+[32m+[m[32m        if (nuevaVenta.ocArchivoUrl) {[m
+[32m+[m[32m            db.presupuestos[presIndex].ocClienteUrl = nuevaVenta.ocArchivoUrl;[m
+[32m+[m[32m            db.presupuestos[presIndex].ocClienteNombre = nuevaVenta.ocArchivoNombre;[m
+[32m+[m[32m        }[m
+     }[m
+ [m
+     if (presupuesto.deudasIncluidas && presupuesto.deudasIncluidas.length > 0) {[m
+[1mdiff --git a/modules/presupuestos/detalle.js b/modules/presupuestos/detalle.js[m
+[1mindex d7c3056..be8662a 100644[m
+[1m--- a/modules/presupuestos/detalle.js[m
+[1m+++ b/modules/presupuestos/detalle.js[m
+[36m@@ -34,6 +34,7 @@[m [mwindow.verPresupuestoDetalle = (id) => {[m
+             <div class="grid grid-cols-2 gap-2 text-sm mb-4">[m
+                 <p><strong>Cliente:</strong> ${escapeHtml(p.cliente)}</p>[m
+                 <p><strong>Total con IVA:</strong> $${formatNumber(p.total)}</p>[m
+[32m+[m[32m                ${p.patente || p.vehiculoMarca ? `<p class="col-span-2"><strong>Vehículo:</strong> ${escapeHtml(p.vehiculoMarca || '')} ${p.patente ? `(Patente: ${escapeHtml(p.patente)})` : ''}</p>` : ''}[m
+                 <p><strong>Ganancia Neta Real:</strong> $${formatNumber(p.gananciaNetaReal || 0)}</p>[m
+                 <p><strong>Fecha:</strong> ${p.fechaCreacion ? formatDate(p.fechaCreacion) : ''}</p>[m
+                 <p><strong>Estado:</strong> ${p.estado === 'aprobado' ? '✅ Aprobado' : p.estado === 'rechazado' ? '❌ Rechazado' : p.esMora ? '💰 Mora' : '⏳ Pendiente'}</p>[m
+[36m@@ -51,10 +52,17 @@[m [mwindow.verPresupuestoDetalle = (id) => {[m
+             <div class="flex gap-3 flex-wrap">[m
+                 <button onclick="window.descargarPDFPresupuesto(${p.id})" class="bg-blue-600 text-white px-4 py-2 rounded-xl flex-1">📄 Ver / Descargar PDF</button>[m
+                 ${p.estado !== 'aprobado' && !p.esMora ? `<button onclick="window.editarPresupuesto(${p.id})" class="bg-yellow-600 text-white px-4 py-2 rounded-xl flex-1">✏️ Editar</button>` : ''}[m
+[31m-                ${!p.ventaGeneradaId && p.estado !== 'aprobado' ? `<button onclick="window.aprobarPresupuesto(${p.id})" class="bg-green-600 text-white px-4 py-2 rounded-xl flex-1">✅ Aprobar y crear Venta</button>` : ''}[m
+[32m+[m[32m                ${p.estado === 'pendiente' && !p.ventaGeneradaId ? `<button onclick="window.aprobarPresupuesto(${p.id})" class="bg-green-600 text-white px-4 py-2 rounded-xl flex-1">✅ Aprobar y crear Venta</button>` : ''}[m
+[32m+[m[32m                ${p.estado === 'pendiente' && !p.esMora ? `<button onclick="window.rechazarPresupuesto(${p.id})" class="

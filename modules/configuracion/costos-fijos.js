@@ -6,7 +6,7 @@
 import { getDB, guardarDB } from '../db.js';
 import {
     formatNumber, mostrarNotificacion, escapeHtml, formatDate, generarId,
-    inputFechaHTML, initInputFecha, getValorFecha, parseFechaLocal, dateToISO, hoyISO} from '../utils.js';
+    inputFechaHTML, initInputFecha, getValorFecha, parseFechaLocal, dateToISO, hoyISO, confirmarAccion} from '../utils.js';
 import { crearModal, cerrarModal } from './helpers.js';
 
 // ==================== RENDER TAB ====================
@@ -157,8 +157,8 @@ window.pagarCostoFijo = (id) => {
 };
 
 // ==================== ELIMINAR ====================
-window.eliminarCostoFijo = (id) => {
-    if (!confirm('¿Eliminar este costo fijo? No se podrá recuperar.')) return;
+window.eliminarCostoFijo = async (id) => {
+    if (!(await confirmarAccion({ titulo: '🗑️ Eliminar costo fijo', mensaje: '¿Eliminar este costo fijo? No se podrá recuperar.', textoConfirmar: '🗑️ Sí, eliminar', icono: '📅' }))) return;
     const db = getDB();
     db.costosFijos = db.costosFijos.filter(c => c.id !== id);
     guardarDB();

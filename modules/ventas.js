@@ -78,7 +78,41 @@ export function renderVentas() {
             </div>
 
             <div class="space-y-3">
-                ${ventasFiltradas.map(v => renderVentaCard(v, db)).join('') || '<div class="bg-white dark:bg-gray-800 rounded-2xl p-8 text-center shadow"><p class="text-gray-500">📭 No hay ventas en este mes</p></div>'}
+                ${(() => {
+                    // 🔥 v7.22.27: sectorizar ventas por estado
+                    const grupos = {
+                        'cobrado': { titulo: '✅ Cobradas', items: [] },
+                        'pendiente_cobro': { titulo: '💰 Pendientes de cobro (factura emitida)', items: [] },
+                        'pendiente_factura': { titulo: '📄 Pendientes de factura', items: [] }
+                    };
+                    
+                    ventasFiltradas.forEach(v => {
+                        const estado = v.estado || 'pendiente_factura';
+                        if (grupos[estado]) {
+                            grupos[estado].items.push(v);
+                        } else {
+                            grupos['pendiente_factura'].items.push(v);
+                        }
+                    });
+                    
+                    let html = '';
+                    Object.values(grupos).forEach(grupo => {
+                        if (grupo.items.length === 0) return;
+                        html += `
+                            <div class="flex items-center gap-3 my-4">
+                                <div class="h-px flex-1 bg-gray-300 dark:bg-gray-600"></div>
+                                <span class="text-sm font-bold text-gray-600 dark:text-gray-400">${grupo.titulo} (${grupo.items.length})</span>
+                                <div class="h-px flex-1 bg-gray-300 dark:bg-gray-600"></div>
+                            </div>
+                        `;
+                        html += grupo.items.map(v => renderVentaCard(v, db)).join('');
+                    });
+                    
+                    if (html === '') {
+                        return '<div class="bg-white dark:bg-gray-800 rounded-2xl p-8 text-center shadow"><p class="text-gray-500">📭 No hay ventas en este mes</p></div>';
+                    }
+                    return html;
+                })()}
             </div>
         </div>
     `;
@@ -92,17 +126,33 @@ function renderVentaCard(v, db) {
     };
     const estado = estadoMap[v.estado] || estadoMap['pendiente_factura'];
 
-    let diasRestantes = null;
+    let diasPendiente = null;
     let alerta = '';
-    // 🔥 v7.16.68: solo calcular vencimiento si está pendiente
-    if (v.estado === 'cobrado') {
-        diasRestantes = null;
-        alerta = '';  // No mostrar vencimiento si ya está cobrado
-    } else if (v.fechaCobroEsperada) {
-        diasRestantes = calcularDiasRestantes(v.fechaCobroEsperada);
-        if (diasRestantes < 0) alerta = '🔴 Vencido hace ' + Math.abs(diasRestantes) + ' días';
-        else if (diasRestantes === 0) alerta = '🟠 Vence hoy';
-        else if (diasRestantes <= 3) alerta = '🟡 Vence en ' + diasRestantes + ' días';
+    let diasRestantes = null;
+    
+    if (v.estado !== 'cobrado' && v.fechaVenta) {
+        // 🔥 v7.22.47: contador "Día N" desde fechaVenta
+        const [a, m, d] = v.fechaVenta.split('-').map(Number);
+        const fechaVentaLocal = new Date(a, m - 1, d);
+        const hoy = new Date();
+        hoy.setHours(0, 0, 0, 0);
+        fechaVentaLocal.setHours(0, 0, 0, 0);
+        diasPendiente = Math.floor((hoy - fechaVentaLocal) / (1000 * 60 * 60 * 24)) + 1;
+        
+        // 🔥 Alerta de vencimiento (solo si fechaCobroEsperada existe y ya pasó)
+        if (v.fechaCobroEsperada) {
+            const [ae, me, de] = v.fechaCobroEsperada.split('-').map(Number);
+            const fechaCobroLocal = new Date(ae, me - 1, de);
+            fechaCobroLocal.setHours(0, 0, 0, 0);
+            diasRestantes = Math.floor((fechaCobroLocal - hoy) / (1000 * 60 * 60 * 24));
+            
+            if (diasRestantes < 0) {
+                alerta = `🔴 Vencido hace ${Math.abs(diasRestantes)} día${Math.abs(diasRestantes) !== 1 ? 's' : ''}`;
+            }
+        }
+    } else if (v.estado === 'cobrado' && v.diasDemoraCobro !== undefined) {
+        // Mostrar cuántos días tardó el cobro
+        alerta = `✅ Cobrado en ${v.diasDemoraCobro} día${v.diasDemoraCobro !== 1 ? 's' : ''}`;
     }
 
     const ocText = v.ordenCompraCliente ? `OC: ${escapeHtml(v.ordenCompraCliente)}` : '';
@@ -116,8 +166,12 @@ function renderVentaCard(v, db) {
                         <h3 class="font-bold text-lg">${escapeHtml(v.clienteNombre)}</h3>
                         <span class="text-xs px-3 py-1 rounded-full ${estado.color}">${estado.label}</span>
                         ${v.presupuestoId ? `<span class="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded">📄 P-${v.presupuestoId}</span>` : ''}
+                        ${v.patente ? `<span class="text-xs bg-gray-100 text-gray-700 px-2 py-0.5 rounded">🚗 ${escapeHtml(v.patente)}</span>` : ''}
+                        ${v.esVentaAgrupada ? `<span class="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded font-bold">📦 Venta agrupada (${(v.presupuestosOrigenNumeros || []).length})</span>` : ''}
+                        ${v.ajusteRedondeo && Math.abs(v.ajusteRedondeo) > 0.001 ? `<span class="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded font-bold" title="Ajuste por redondeo OC vs presupuestos">⚖️ Ajuste: ${v.ajusteRedondeo > 0 ? '+' : ''}$${formatNumber(Math.abs(v.ajusteRedondeo))}</span>` : ''}
                         ${ocText ? `<span class="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded">📋 ${ocText}</span>` : ''}
-                        ${alerta ? `<span class="text-xs font-bold ${diasRestantes < 0 ? 'text-red-600' : 'text-orange-600'}">${alerta}</span>` : ''}
+                        ${diasPendiente !== null ? `<span class="text-xs font-bold bg-blue-100 text-blue-700 px-2 py-0.5 rounded">📅 Día ${diasPendiente}</span>` : ''}
+                        ${alerta ? `<span class="text-xs font-bold ${alerta.includes('Vencido') ? 'text-red-600' : 'text-green-600'}">${alerta}</span>` : ''}
                     </div>
                     <div class="grid grid-cols-2 md:grid-cols-4 gap-2 mt-2 text-sm">
                         <div><span class="text-gray-500">Factura:</span> <span class="font-semibold">${escapeHtml(v.tipoComprobante || '')} ${escapeHtml(v.numFacturaEmitida || v.numComprobante || '')}</span></div>
@@ -184,11 +238,45 @@ window.verDetalleVenta = (ventaId) => {
                     <div><span class="text-gray-500">Nº Factura:</span> <span class="font-semibold">${escapeHtml(venta.numFacturaEmitida || venta.numComprobante || 'Sin número')}</span></div>
                     <div><span class="text-gray-500">Fecha factura:</span> ${venta.fechaFactura ? formatDate(venta.fechaFactura) : 'No emitida'}</div>
                     <div><span class="text-gray-500">Fecha venta:</span> ${venta.fechaVenta ? formatDate(venta.fechaVenta) : '-'}</div>
+                    ${venta.esVentaAgrupada ? `
+                        <div class="col-span-2 mt-2 p-2 bg-indigo-50 dark:bg-indigo-900/20 rounded">
+                            <p class="text-xs font-bold text-indigo-800 dark:text-indigo-200">📦 Venta agrupada (${(venta.presupuestosOrigenNumeros || []).length} presupuestos)</p>
+                            <p class="text-xs text-indigo-600 dark:text-indigo-300">${(venta.presupuestosOrigenNumeros || []).join(', ')}</p>
+                            ${venta.totalPresupuestos ? `
+                                <div class="mt-2 pt-2 border-t border-indigo-200 dark:border-indigo-700 text-xs">
+                                    <div class="flex justify-between"><span>Suma de presupuestos:</span><span>$${formatNumber(venta.totalPresupuestos)}</span></div>
+                                    <div class="flex justify-between"><span>Total OC del cliente:</span><span>$${formatNumber(venta.ocClienteTotal || venta.total)}</span></div>
+                                    ${venta.ajusteRedondeo && Math.abs(venta.ajusteRedondeo) > 0.001 ? `
+                                        <div class="flex justify-between font-bold ${venta.ajusteRedondeo > 0 ? 'text-green-600' : 'text-orange-600'}">
+                                            <span>Ajuste por redondeo:</span>
+                                            <span>${venta.ajusteRedondeo > 0 ? '+' : ''}$${formatNumber(venta.ajusteRedondeo)}</span>
+                                        </div>
+                                    ` : '<div class="text-green-600 font-bold">✅ Sin diferencia</div>'}
+                                </div>
+                            ` : ''}
+                            <div class="mt-2 pt-2 border-t border-indigo-200 dark:border-indigo-700 flex gap-2 flex-wrap">
+                                <button onclick="window.editarOCVentaAgrupada('${venta.id}')" class="bg-blue-600 text-white px-2 py-1 rounded text-xs">
+                                    ${venta.ocArchivoUrl ? '✏️ Editar OC' : '📎 Cargar OC'}
+                                </button>
+                                <button onclick="window.editarPresupuestosVentaAgrupada('${venta.id}')" class="bg-indigo-600 text-white px-2 py-1 rounded text-xs">
+                                    ✏️ Editar presupuestos
+                                </button>
+                                <button onclick="window.generarOCAlTaller('${venta.id}')" class="bg-teal-600 text-white px-2 py-1 rounded text-xs">
+                                    📄 Generar OC al Taller
+                                </button>
+                            </div>
+                        </div>
+                    ` : ''}
                 </div>
                 <div class="grid grid-cols-2 gap-2 border-b dark:border-gray-700 pb-2">
                     <div class="col-span-2"><span class="text-gray-500">OC Cliente:</span> <span class="font-semibold">${escapeHtml(venta.ordenCompraCliente || 'Sin OC')}</span></div>
+                    ${venta.patente ? `<div class="col-span-2"><span class="text-gray-500">Vehículo:</span> <span class="font-semibold">${escapeHtml(venta.vehiculoMarca || '')} ${venta.patente ? `(${escapeHtml(venta.patente)})` : ''}</span></div>` : ''}
                     ${venta.fechaRecepcionOC ? `<div><span class="text-gray-500">Fecha recepción OC:</span> ${formatDate(venta.fechaRecepcionOC)}</div>` : ''}
-                    ${venta.ocArchivoUrl ? `<div class="col-span-2"><a href="${venta.ocArchivoUrl}" target="_blank" class="text-blue-600 underline">📎 Ver OC adjunta</a></div>` : ''}
+                    ${venta.ocArchivoUrl ? `<div class="col-span-2"><a href="${venta.ocArchivoUrl}" target="_blank" class="text-blue-600 underline">📎 Ver OC adjunta (cliente)</a></div>` : ''}
+                    ${venta.ocTallerUrl ? `<div class="col-span-2 flex items-center gap-2">
+                        <a href="${venta.ocTallerUrl}" target="_blank" class="text-teal-600 underline font-bold">📎 Ver OC al Taller</a>
+                        <button onclick="event.stopPropagation();window.eliminarOCTaller('${venta.id}')" class="bg-red-100 text-red-700 px-2 py-0.5 rounded text-xs hover:bg-red-200">🗑️</button>
+                    </div>` : ''}
                 </div>
                 <div class="grid grid-cols-2 gap-2 border-b dark:border-gray-700 pb-2">
                     <div><span class="text-gray-500">Monto Neto (sin IVA):</span> <span class="font-bold">$${formatNumber(venta.montoNeto)}</span></div>
@@ -198,6 +286,7 @@ window.verDetalleVenta = (ventaId) => {
                 <div class="grid grid-cols-2 gap-2 border-b dark:border-gray-700 pb-2">
                     <div><span class="text-gray-500">Cobro esperado:</span> ${venta.fechaCobroEsperada ? formatDate(venta.fechaCobroEsperada) : '-'}</div>
                     ${venta.fechaCobro ? `<div><span class="text-gray-500">Fecha de cobro:</span> ${formatDate(venta.fechaCobro)}</div>` : ''}
+                    ${venta.diasDemoraCobro !== undefined && venta.diasDemoraCobro !== null ? `<div><span class="text-gray-500">Demora de cobro:</span> <strong class="${venta.diasDemoraCobro > 30 ? 'text-red-600' : 'text-green-600'}">${venta.diasDemoraCobro} día${venta.diasDemoraCobro !== 1 ? 's' : ''}</strong></div>` : ''}
                     ${venta.medioPago ? `<div><span class="text-gray-500">Medio de pago:</span> ${escapeHtml(venta.medioPago)}</div>` : ''}
                     ${venta.comprobanteCobro ? `<div><span class="text-gray-500">Comprobante:</span> ${escapeHtml(venta.comprobanteCobro)}</div>` : ''}
                     ${venta.comprobanteCobroUrl ? `<div class="col-span-2"><a href="${venta.comprobanteCobroUrl}" target="_blank" class="text-blue-600 underline">📎 Ver comprobante de pago</a></div>` : ''}
@@ -215,6 +304,52 @@ window.verDetalleVenta = (ventaId) => {
                         <a href="${venta.facturaEmitidaUrl}" target="_blank" class="text-blue-600 underline text-sm">📎 Ver factura emitida</a>
                     </div>
                 ` : ''}
+                ${(() => {
+                    // 🔥 v7.24.6: Unificar compras vinculadas (por venta y por ítems) sin duplicar
+                    const comprasSet = new Set();
+                    const comprasUnicas = [];
+                    
+                    // 1. Compras vinculadas directamente a la venta
+                    (venta.comprasVinculadas || []).forEach(cv => {
+                        const compra = db.compras?.find(c => String(c.id) === String(cv.compraId));
+                        if (compra && !comprasSet.has(String(compra.id))) {
+                            comprasSet.add(String(compra.id));
+                            comprasUnicas.push(compra);
+                        }
+                    });
+                    
+                    // 2. Compras vinculadas a través de los ítems de los presupuestos
+                    const presupuestosIds = venta.presupuestosOrigenIds || [venta.presupuestoId].filter(Boolean);
+                    presupuestosIds.forEach(pid => {
+                        const p = db.presupuestos?.find(x => String(x.id) === String(pid));
+                        if (p && p.items) {
+                            p.items.forEach(item => {
+                                if (item.compraVinculadaId) {
+                                    const compra = db.compras?.find(c => String(c.id) === String(item.compraVinculadaId));
+                                    if (compra && !comprasSet.has(String(compra.id))) {
+                                        comprasSet.add(String(compra.id));
+                                        comprasUnicas.push(compra);
+                                    }
+                                }
+                            });
+                        }
+                    });
+                    
+                    if (comprasUnicas.length === 0) return '';
+                    
+                    return `
+                        <div class="border-b dark:border-gray-700 pb-2">
+                            <p class="text-sm font-bold mb-1">🔗 Compras vinculadas:</p>
+                            ${comprasUnicas.map(compra => `
+                                <div class="flex justify-between items-center text-xs p-1 bg-gray-100 dark:bg-gray-700 rounded mb-1">
+                                    <span>${escapeHtml(compra.proveedorNombre || compra.concepto || 'Compra')} - $${formatNumber(compra.totalFactura || 0)}</span>
+                                    <button onclick="event.stopPropagation(); window.verDetalleCompra('${compra.id}')" class="text-blue-600 underline">👁️ Ver</button>
+                                </div>
+                            `).join('')}
+                        </div>
+                    `;
+                })()}
+
                 ${venta.observaciones ? `
                     <div class="pt-1">
                         <span class="text-gray-500">Observaciones:</span>
@@ -222,7 +357,8 @@ window.verDetalleVenta = (ventaId) => {
                     </div>
                 ` : ''}
             </div>
-            <div class="flex gap-3 mt-4">
+            <div class="flex gap-3 mt-4 flex-wrap">
+                ${venta.estado === 'pendiente_cobro' ? `<button onclick="this.closest('.modal').remove(); window.mostrarModalCobrarVenta('${venta.id}')" class="flex-1 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-xl">💵 Confirmar Pago</button>` : ''}
                 <button onclick="window.verTrazabilidad('venta','${venta.id}')" class="flex-1 bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-xl">🔗 Ver trazabilidad</button>
                 <button onclick="this.closest('.modal').remove()" class="flex-1 bg-gray-300 dark:bg-gray-600 hover:bg-gray-400 py-2 rounded-xl">Cerrar</button>
             </div>
@@ -287,9 +423,18 @@ window.mostrarModalCargarFactura = (ventaId) => {
                     <div class="flex items-center gap-2">
                         <label class="cursor-pointer bg-gray-200 dark:bg-gray-700 px-4 py-2 rounded-lg text-sm hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors">
                             Seleccionar archivo
-                            <input type="file" id="facturaFile" accept=".pdf,image/*" class="hidden" onchange="window.actualizarNombreArchivo(this, 'nombreFacturaFile')">
+                            <input type="file" id="facturaFile" accept=".pdf,image/*" class="hidden" onchange="window._onFacturaFileChange(this)">
                         </label>
                         <span id="nombreFacturaFile" class="text-sm text-gray-500">Ningún archivo seleccionado</span>
+                    </div>
+                    <div id="previewFacturaContainer" class="hidden mt-2 p-2 bg-gray-100 dark:bg-gray-800 rounded-lg">
+                        <div class="flex items-center justify-between">
+                            <span id="previewFacturaNombre" class="text-xs font-bold truncate"></span>
+                            <div class="flex gap-1">
+                                <button type="button" id="btnVerFactura" class="bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs">👁️ Ver</button>
+                                <button type="button" id="btnQuitarFactura" class="bg-red-100 text-red-700 px-2 py-1 rounded text-xs">🗑️ Quitar</button>
+                            </div>
+                        </div>
                     </div>
 
                     <hr class="border-gray-200 dark:border-gray-700">
@@ -479,6 +624,14 @@ window.mostrarModalCargarFactura = (ventaId) => {
             venta.comprobanteCobro = comprobante || null;
             venta.fechaCobroEsperada = fechaCobro;
             venta.diasCobroCliente = 0;
+            // 🔥 v7.22.47: calcular días de demora del cobro
+            if (venta.fechaVenta && fechaCobro) {
+                const [af, mf, df] = venta.fechaVenta.split('-').map(Number);
+                const [ac, mc, dc] = fechaCobro.split('-').map(Number);
+                const fechaV = new Date(af, mf - 1, df);
+                const fechaC = new Date(ac, mc - 1, dc);
+                venta.diasDemoraCobro = Math.floor((fechaC - fechaV) / (1000 * 60 * 60 * 24));
+            }
         } else {
             const diasCobro = parseInt(document.getElementById('diasCobroFactura').value) || 0;
             venta.diasCobroCliente = diasCobro;
@@ -510,6 +663,24 @@ window.mostrarModalCargarFactura = (ventaId) => {
                     mostrarNotificacion('Error subiendo factura: ' + e.message, 'error');
                 }
             }
+            
+            // 🔥 v7.22.96: Calcular monto neto e IVA al guardar la factura
+            const total = venta.total || 0;
+            venta.montoNeto = +(total / 1.21).toFixed(2);
+            venta.ivaMonto = +(total - venta.montoNeto).toFixed(2);
+            venta.iva = 21;
+            
+            // 🔥 Asegurar que el estado se guarde correctamente
+            // Si ya tiene factura cargada y no está cobrado, pasar a pendiente_cobro
+            if (venta.numFacturaEmitida && venta.facturaEmitidaUrl && venta.estado !== 'cobrado') {
+                venta.estado = 'pendiente_cobro';
+            }
+            
+            console.log('💾 Guardando factura:');
+            console.log('   Estado:', venta.estado);
+            console.log('   Monto Neto:', venta.montoNeto);
+            console.log('   IVA:', venta.ivaMonto);
+            
             guardarDB();
             mostrarNotificacion('✅ Factura cargada exitosamente', 'success');
             window.dispatchEvent(new Event('refreshView'));
@@ -576,28 +747,24 @@ window.mostrarModalCobrarVenta = (ventaId) => {
                     <label class="block text-sm font-medium">📄 Nº de comprobante</label>
                     <input type="text" id="comprobante" placeholder="Nº de transferencia / cheque" class="w-full p-3 border rounded-xl">
 
-                    <!-- 🔥 v7.16.4: factura emitida separada del comprobante de pago -->
-                    <div class="border-t pt-3">
-                        <label class="block text-sm font-medium mb-1">🧾 Factura emitida (opcional)</label>
-                        <p class="text-xs text-gray-500 mb-2">Subí acá la factura que le emitiste al cliente.</p>
-                        <div class="flex items-center gap-2">
-                            <label class="cursor-pointer bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm">
-                                📎 Seleccionar factura
-                                <input type="file" id="facturaEmitidaFile" accept="image/*,.pdf" class="hidden" onchange="window.actualizarNombreArchivo(this, 'nombreFacturaEmitidaFile')">
-                            </label>
-                            <span id="nombreFacturaEmitidaFile" class="text-sm text-gray-500">Ningún archivo seleccionado</span>
-                        </div>
-                    </div>
-
                     <div class="border-t pt-3">
                         <label class="block text-sm font-medium mb-1">💳 Comprobante de pago (opcional)</label>
                         <p class="text-xs text-gray-500 mb-2">Subí acá la transferencia, cheque o ticket que te dio el cliente.</p>
                         <div class="flex items-center gap-2">
                             <label class="cursor-pointer bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm">
                                 📎 Seleccionar comprobante
-                                <input type="file" id="comprobanteFile" accept="image/*,.pdf" class="hidden" onchange="window.actualizarNombreArchivo(this, 'nombreComprobanteFile')">
+                                <input type="file" id="comprobanteFile" accept="image/*,.pdf" class="hidden" onchange="window._onComprobanteFileChange(this)">
                             </label>
                             <span id="nombreComprobanteFile" class="text-sm text-gray-500">Ningún archivo seleccionado</span>
+                        </div>
+                        <div id="previewComprobanteContainer" class="hidden mt-2 p-2 bg-gray-100 dark:bg-gray-800 rounded-lg">
+                            <div class="flex items-center justify-between">
+                                <span id="previewComprobanteNombre" class="text-xs font-bold truncate"></span>
+                                <div class="flex gap-1">
+                                    <button type="button" id="btnVerComprobante" class="bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs">👁️ Ver</button>
+                                    <button type="button" id="btnQuitarComprobante" class="bg-red-100 text-red-700 px-2 py-1 rounded text-xs">🗑️ Quitar</button>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -754,6 +921,14 @@ window.mostrarModalCobrarVenta = (ventaId) => {
         venta.interesMora = interes > 0 ? interes : null;
         venta.netoRecibido = netoRecibido;
         venta.comprobanteCobro = comprobante || null;
+        // 🔥 v7.22.47: calcular días de demora del cobro
+        if (venta.fechaVenta && fecha) {
+            const [af, mf, df] = venta.fechaVenta.split('-').map(Number);
+            const [ac, mc, dc] = fecha.split('-').map(Number);
+            const fechaV = new Date(af, mf - 1, df);
+            const fechaC = new Date(ac, mc - 1, dc);
+            venta.diasDemoraCobro = Math.floor((fechaC - fechaV) / (1000 * 60 * 60 * 24));
+        }
 
         // 🔥 v7.16.4: crear movimiento de tesorería del cobro
         if (!db.movimientos) db.movimientos = [];
@@ -2301,6 +2476,32 @@ window.editarVenta = (ventaId) => {
         '<p><strong>ID:</strong> <code class="text-xs">' + venta.id + '</code></p>' +
         '</div>' +
 
+        // 🔥 v7.22.45: sección especial para ventas agrupadas
+        (venta.esVentaAgrupada ? (
+            '<div class="bg-indigo-50 dark:bg-indigo-900/20 p-3 rounded-xl mb-3 border-l-4 border-indigo-500">' +
+            '<p class="font-bold text-indigo-800 dark:text-indigo-200">📦 Venta agrupada (' + (venta.presupuestosOrigenNumeros || []).length + ' presupuestos)</p>' +
+            '<p class="text-xs text-indigo-600 dark:text-indigo-300">' + (venta.presupuestosOrigenNumeros || []).join(', ') + '</p>' +
+            '<div class="mt-2 text-xs space-y-1">' +
+            '<div class="flex justify-between"><span>Suma de presupuestos:</span><strong>$' + formatNumber(venta.totalPresupuestos || 0) + '</strong></div>' +
+            '<div class="flex justify-between"><span>Total OC:</span><strong>$' + formatNumber(venta.ocClienteTotal || venta.total) + '</strong></div>' +
+            '<div class="flex justify-between"><span>Ajuste por redondeo:</span><strong class="' + ((venta.ajusteRedondeo && Math.abs(venta.ajusteRedondeo) > 0.001) ? (venta.ajusteRedondeo > 0 ? 'text-green-600' : 'text-orange-600') : 'text-green-600') + '">' +
+                (venta.ajusteRedondeo && Math.abs(venta.ajusteRedondeo) > 0.001 ? ((venta.ajusteRedondeo > 0 ? '+' : '') + '$' + formatNumber(venta.ajusteRedondeo)) : '✅ Sin diferencia') +
+            '</strong></div>' +
+            '</div>' +
+            '<div class="mt-2 flex gap-2 flex-wrap">' +
+            '<button type="button" onclick="document.querySelector(\'.modal\')?.remove(); window.editarOCVentaAgrupada(\'' + venta.id + '\')" class="bg-blue-600 text-white px-2 py-1 rounded text-xs">' +
+                (venta.ocArchivoUrl ? '✏️ Editar OC' : '📎 Cargar OC') +
+            '</button>' +
+            '<button type="button" onclick="document.querySelector(\'.modal\')?.remove(); window.editarPresupuestosVentaAgrupada(\'' + venta.id + '\')" class="bg-indigo-600 text-white px-2 py-1 rounded text-xs">' +
+                '✏️ Editar presupuestos' +
+            '</button>' +
+            '</div>' +
+            (venta.ocArchivoUrl ? '<p class="text-xs mt-1"><a href="' + venta.ocArchivoUrl + '" target="_blank" class="text-blue-600 underline">📎 Ver OC adjunta</a></p>' : '') +
+            (venta.ocClienteNumero ? '<p class="text-xs mt-1">📋 Nº OC: <strong>' + escapeHtml(venta.ocClienteNumero) + '</strong></p>' : '') +
+            (venta.fechaRecepcionOC ? '<p class="text-xs">📅 Fecha recepción OC: ' + formatDate(venta.fechaRecepcionOC) + '</p>' : '') +
+            '</div>'
+        ) : '') +
+
         // 🔥 v7.16.68: selector de estado
         '<div class="grid grid-cols-2 gap-3 mb-3">' +
         '<div>' +
@@ -2687,6 +2888,14 @@ window.verArchivo = (ventaId, campo) => {
     const dataUrl = venta[campo];
     if (!dataUrl) { mostrarNotificacion('No hay archivo para ver', 'warning'); return; }
 
+    // 🔥 v7.24.8: Detectar si es URL de Storage o data URL (base64)
+    if (dataUrl.startsWith('http://') || dataUrl.startsWith('https://')) {
+        // Es una URL de Firebase Storage → abrir directamente
+        window.open(dataUrl, '_blank');
+        return;
+    }
+
+    // Si es data URL (base64), convertir a Blob
     try {
         const partes = dataUrl.split(',');
         if (partes.length !== 2) {
@@ -2706,7 +2915,6 @@ window.verArchivo = (ventaId, campo) => {
         const url = URL.createObjectURL(blob);
 
         if (mimeType.startsWith('image/')) {
-            // Modal con imagen
             const modal = document.createElement('div');
             modal.className = 'modal';
             modal.style.zIndex = '9999';
@@ -2716,27 +2924,16 @@ window.verArchivo = (ventaId, campo) => {
                     <div class="bg-gray-100 dark:bg-gray-900 rounded-lg p-2 text-center">
                         <img src="${url}" style="max-width:100%;max-height:70vh;object-fit:contain;">
                     </div>
-                    <button onclick="this.closest('.modal').remove();" class="mt-3 w-full bg-gray-300 dark:bg-gray-600 py-2 rounded-xl">
-                        Cerrar
-                    </button>
+                    <button onclick="this.closest('.modal').remove();" class="mt-3 w-full bg-gray-300 dark:bg-gray-600 py-2 rounded-xl">Cerrar</button>
                 </div>
             `;
             document.body.appendChild(modal);
-        } else if (mimeType === 'application/pdf') {
-            // PDF: abrir en nueva pestaña con blob URL (evita el bloqueo de Chrome)
-            const nuevaVentana = window.open(url, '_blank');
-            if (!nuevaVentana) {
-                mostrarNotificacion('Permití las ventanas emergentes para ver el PDF', 'warning');
-            }
         } else {
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = venta[campo === 'facturaEmitidaUrl' ? 'facturaEmitidaNombre' : 'comprobanteCobroNombre'] || 'archivo';
-            a.click();
+            window.open(url, '_blank');
         }
-    } catch(e) {
-        console.error('Error abriendo archivo:', e);
-        mostrarNotificacion('Error al abrir el archivo: ' + e.message, 'error');
+    } catch (err) {
+        console.error('Error al abrir archivo:', err);
+        mostrarNotificacion('Error al abrir archivo: ' + err.message, 'error');
     }
 };
 
@@ -2918,4 +3115,1120 @@ window.desvincularCompraDeVenta = async (ventaId, compraId) => {
     window.dispatchEvent(new Event('refreshView'));
 
     setTimeout(() => window.verDetalleVenta(ventaId), 200);
+};
+
+// ==================== 🔥 v7.22.44: EDITAR OC EN VENTA AGRUPADA ====================
+window.editarOCVentaAgrupada = async (ventaId) => {
+    const db = getDB();
+    const venta = db.ventas.find(v => String(v.id) === String(ventaId));
+    if (!venta || !venta.esVentaAgrupada) {
+        mostrarNotificacion('Venta agrupada no encontrada', 'error');
+        return;
+    }
+
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+    modal.innerHTML = `
+        <div class="modal-content w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <h2 class="text-xl font-bold mb-3">📎 Orden de Compra - Venta agrupada</h2>
+            <div class="bg-gray-50 dark:bg-gray-800 p-4 rounded-xl space-y-3 text-sm">
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1">Número OC:</label>
+                        <input type="text" id="editOcNumero" value="${escapeHtml(venta.ocClienteNumero || venta.ordenCompraCliente || '')}" class="w-full border rounded-xl px-3 py-1 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1">Fecha recepción OC:</label>
+                        ${inputFechaHTML('editOcFechaRecepcion', venta.fechaRecepcionOC || hoyISO(), { label: '' })}
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-500 mb-1">Adjuntar OC (PDF o imagen):</label>
+                    <input type="file" id="editOcArchivo" accept=".pdf,.jpg,.jpeg,.png" class="w-full border rounded-xl px-3 py-1 text-sm">
+                    <div id="editOcPreview" class="${venta.ocArchivoUrl ? '' : 'hidden'} mt-2">
+                        <div class="flex items-center justify-between bg-white dark:bg-gray-700 p-2 rounded-lg border">
+                            <div class="flex items-center gap-2">
+                                <span class="text-2xl">📄</span>
+                                <div>
+                                    <p id="editOcNombre" class="text-xs font-bold truncate max-w-[200px]">${escapeHtml(venta.ocArchivoNombre || 'OC adjunta')}</p>
+                                    <p id="editOcTamanio" class="text-xs text-gray-500">${venta.ocArchivoUrl ? 'Archivo actual' : ''}</p>
+                                </div>
+                            </div>
+                            <div class="flex gap-1">
+                                ${venta.ocArchivoUrl ? `<a href="${venta.ocArchivoUrl}" target="_blank" class="bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs">👁️ Ver</a>` : ''}
+                                <button type="button" onclick="window._quitarOCEdicion()" class="bg-red-100 text-red-700 px-2 py-1 rounded text-xs">🗑️ Quitar</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-500 mb-1">Total OC:</label>
+                    <input type="number" id="editOcTotal" value="${venta.ocClienteTotal || venta.total || 0}" step="0.01" min="0" class="w-full border rounded-xl px-3 py-2 text-right text-lg font-bold">
+                </div>
+                <div class="border-t pt-2">
+                    <div class="flex justify-between">
+                        <span class="text-gray-600 dark:text-gray-400">Suma de presupuestos:</span>
+                        <strong>$${formatNumber(venta.totalPresupuestos || 0)}</strong>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-600 dark:text-gray-400">Diferencia (OC - Presupuestos):</span>
+                        <strong id="editOcDiferencia" class="text-green-600">$0,00</strong>
+                    </div>
+                    <p id="editOcAviso" class="text-xs mt-1"></p>
+                </div>
+            </div>
+            <div class="flex gap-2 mt-4">
+                <button onclick="this.closest('.modal').remove()" class="bg-gray-300 text-gray-700 px-4 py-2 rounded-xl flex-1">Cancelar</button>
+                <button onclick="window._guardarEdicionOC('${venta.id}')" class="bg-blue-600 text-white px-4 py-2 rounded-xl flex-1 font-bold">💾 Guardar OC</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+
+    // 🔥 v7.22.46: inicializar el input de fecha
+    initInputFecha('editOcFechaRecepcion');
+    
+    const inputTotal = document.getElementById('editOcTotal');
+    const spanDif = document.getElementById('editOcDiferencia');
+    const spanAviso = document.getElementById('editOcAviso');
+    const inputArchivo = document.getElementById('editOcArchivo');
+    const preview = document.getElementById('editOcPreview');
+    const previewNombre = document.getElementById('editOcNombre');
+    const previewTamanio = document.getElementById('editOcTamanio');
+
+    let archivoNuevo = null;
+    window._eliminarOcGuardada = false;
+
+    const sumaPresupuestos = venta.totalPresupuestos || 0;
+    const actualizarDif = () => {
+        const total = parseFloat(inputTotal.value) || 0;
+        const dif = +(total - sumaPresupuestos).toFixed(2);
+        const abs = Math.abs(dif);
+        spanDif.textContent = (dif > 0 ? '+' : '') + '$' + formatNumber(dif);
+        if (abs === 0) {
+            spanDif.className = 'text-green-600 font-bold';
+            spanAviso.innerHTML = '✅ La OC coincide con los presupuestos.';
+            spanAviso.className = 'text-xs text-green-600 mt-1';
+        } else if (abs <= 10) {
+            spanDif.className = 'text-orange-600 font-bold';
+            spanAviso.innerHTML = '⚠️ Diferencia aceptable (≤ $10). Se guardará con el total de la OC.';
+            spanAviso.className = 'text-xs text-orange-600 mt-1';
+        } else {
+            spanDif.className = 'text-red-600 font-bold';
+            spanAviso.innerHTML = '⚠️ Diferencia mayor a $10. Verificá que sea correcto.';
+            spanAviso.className = 'text-xs text-red-600 mt-1';
+        }
+    };
+
+    inputTotal.addEventListener('input', actualizarDif);
+    actualizarDif();
+
+    inputArchivo.addEventListener('change', (e) => {
+        const f = e.target.files[0];
+        if (!f) return;
+        archivoNuevo = f;
+        previewNombre.textContent = f.name;
+        previewTamanio.textContent = (f.size / 1024).toFixed(1) + ' KB';
+        preview.classList.remove('hidden');
+        window._eliminarOcGuardada = false;
+
+        // 🔥 v7.22.46: agregar botón "Ver" para el archivo nuevo (sin subir a Storage)
+        const previewContainer = preview.querySelector('.flex.gap-1');
+        if (previewContainer) {
+            // Quitar el botón "Ver" viejo si existía
+            const verViejo = previewContainer.querySelector('a[href]');
+            if (verViejo) verViejo.remove();
+            // Agregar botón "Ver" nuevo (preview local)
+            const btnVer = document.createElement('button');
+            btnVer.type = 'button';
+            btnVer.className = 'bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs';
+            btnVer.textContent = '👁️ Ver';
+            btnVer.onclick = () => {
+                const url = URL.createObjectURL(f);
+                window.open(url, '_blank');
+                setTimeout(() => URL.revokeObjectURL(url), 5000);
+            };
+            previewContainer.insertBefore(btnVer, previewContainer.firstChild);
+        }
+    });
+
+    window._quitarOCEdicion = () => {
+        archivoNuevo = null;
+        inputArchivo.value = '';
+        preview.classList.add('hidden');
+        window._eliminarOcGuardada = true;
+    };
+};
+
+window._guardarEdicionOC = async (ventaId) => {
+    const db = getDB();
+    const venta = db.ventas.find(v => String(v.id) === String(ventaId));
+    if (!venta) { mostrarNotificacion('Venta no encontrada', 'error'); return; }
+
+    const numero = document.getElementById('editOcNumero').value.trim();
+    const fechaRecepcion = getValorFecha('editOcFechaRecepcion');
+    const total = parseFloat(document.getElementById('editOcTotal').value) || 0;
+    const archivoNuevo = document.getElementById('editOcArchivo').files[0];
+    const eliminarOcGuardada = window._eliminarOcGuardada === true;
+
+    const suma = venta.totalPresupuestos || 0;
+    const ajuste = +(total - suma).toFixed(2);
+
+    try {
+        if (eliminarOcGuardada && venta.ocArchivoUrl) {
+            try {
+                const { eliminarArchivoDeStorage } = await import('./firebase.js');
+                await eliminarArchivoDeStorage(venta.ocArchivoUrl);
+            } catch (e) { console.warn('No se pudo eliminar OC de Storage:', e); }
+            venta.ocArchivoUrl = null;
+            venta.ocArchivoNombre = null;
+        }
+
+        if (archivoNuevo) {
+            try {
+                const { subirArchivo } = await import('./firebase.js');
+                const ruta = `presupuestos/oc_${ventaId}_${archivoNuevo.name}`;
+                const url = await subirArchivo(ruta, archivoNuevo);
+                if (venta.ocArchivoUrl && venta.ocArchivoUrl !== url) {
+                    try {
+                        const { eliminarArchivoDeStorage } = await import('./firebase.js');
+                        await eliminarArchivoDeStorage(venta.ocArchivoUrl);
+                    } catch (e) { console.warn('No se pudo eliminar OC vieja:', e); }
+                }
+                venta.ocArchivoUrl = url;
+                venta.ocArchivoNombre = archivoNuevo.name;
+            } catch (err) {
+                console.error('Error al subir OC:', err);
+                mostrarNotificacion('⚠️ No se pudo subir la OC, pero se guardan los demás datos', 'warning');
+            }
+        }
+
+        venta.ocClienteNumero = numero || null;
+        venta.ordenCompraCliente = numero || null;
+        venta.fechaRecepcionOC = fechaRecepcion || null;
+        venta.ocClienteTotal = total;
+        venta.total = total;
+        venta.ajusteRedondeo = ajuste;
+        if (venta.totales) venta.totales.totalFactura = total;
+
+        guardarDB();
+        document.querySelector('.modal')?.remove();
+        mostrarNotificacion(`✅ OC actualizada (Total: $${formatNumber(total)})`, 'success');
+        window._eliminarOcGuardada = false;
+        window.dispatchEvent(new Event('refreshView'));
+    } catch (err) {
+        console.error('Error al guardar OC:', err);
+        mostrarNotificacion('Error al guardar OC: ' + err.message, 'error');
+    }
+};
+
+// ==================== 🔥 v7.22.44: EDITAR PRESUPUESTOS AGRUPADOS ====================
+window.editarPresupuestosVentaAgrupada = async (ventaId) => {
+    const db = getDB();
+    const venta = db.ventas.find(v => String(v.id) === String(ventaId));
+    if (!venta || !venta.esVentaAgrupada) {
+        mostrarNotificacion('Venta agrupada no encontrada', 'error');
+        return;
+    }
+
+    const presupuestosActuales = (venta.presupuestosOrigenIds || [])
+        .map(id => db.presupuestos.find(p => String(p.id) === String(id)))
+        .filter(Boolean);
+
+    const pendientes = (db.presupuestos || []).filter(p =>
+        p.estado === 'pendiente' &&
+        String(p.clienteId) === String(venta.clienteId) &&
+        !(venta.presupuestosOrigenIds || []).some(id => String(id) === String(p.id))
+    );
+
+    const renderLista = (lista) => lista.map(p => `
+        <div class="flex justify-between items-center bg-white dark:bg-gray-700 p-2 rounded-lg border mb-1">
+            <div>
+                <p class="text-xs font-bold">${p.numero} - ${escapeHtml(p.trabajo || 'Trabajo')}</p>
+                <p class="text-xs text-gray-500">$${formatNumber(p.total)}</p>
+            </div>
+            <button onclick="window._togglePresupuestoAgrupado('${p.id}')" class="bg-red-100 text-red-700 px-2 py-1 rounded text-xs">🗑️ Quitar</button>
+        </div>
+    `).join('');
+
+    const renderPendientes = (lista) => lista.map(p => `
+        <div class="flex justify-between items-center bg-white dark:bg-gray-700 p-2 rounded-lg border mb-1">
+            <div>
+                <p class="text-xs font-bold">${p.numero} - ${escapeHtml(p.trabajo || 'Trabajo')}</p>
+                <p class="text-xs text-gray-500">$${formatNumber(p.total)}</p>
+            </div>
+            <button onclick="window._agregarPresupuestoAgrupado('${p.id}')" class="bg-green-100 text-green-700 px-2 py-1 rounded text-xs">➕ Agregar</button>
+        </div>
+    `).join('');
+
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+    modal.innerHTML = `
+        <div class="modal-content w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <h2 class="text-xl font-bold mb-3">✏️ Editar presupuestos agrupados</h2>
+            <div class="bg-gray-50 dark:bg-gray-800 p-4 rounded-xl space-y-3 text-sm">
+                <div>
+                    <p class="font-bold mb-2">📄 Presupuestos en la venta (${presupuestosActuales.length}):</p>
+                    <div id="listaAgrupados">${presupuestosActuales.length ? renderLista(presupuestosActuales) : '<p class="text-xs text-gray-500">No hay presupuestos.</p>'}</div>
+                </div>
+                <div class="border-t pt-2">
+                    <p class="font-bold mb-2">➕ Agregar presupuestos pendientes del mismo cliente (${pendientes.length}):</p>
+                    <div id="listaPendientes">${pendientes.length ? renderPendientes(pendientes) : '<p class="text-xs text-gray-500">No hay presupuestos pendientes.</p>'}</div>
+                </div>
+                <div class="border-t pt-2">
+                    <div class="flex justify-between">
+                        <span>Suma de presupuestos:</span>
+                        <strong id="editPresSuma">$${formatNumber(venta.totalPresupuestos || 0)}</strong>
+                    </div>
+                    <div class="flex justify-between">
+                        <span>Total OC:</span>
+                        <strong>$${formatNumber(venta.ocClienteTotal || venta.total)}</strong>
+                    </div>
+                    <div class="flex justify-between">
+                        <span>Ajuste por redondeo:</span>
+                        <strong id="editPresAjuste">$${formatNumber(venta.ajusteRedondeo || 0)}</strong>
+                    </div>
+                </div>
+            </div>
+            <div class="flex gap-2 mt-4">
+                <button onclick="this.closest('.modal').remove()" class="bg-gray-300 text-gray-700 px-4 py-2 rounded-xl flex-1">Cancelar</button>
+                <button onclick="window._guardarEdicionPresupuestos('${venta.id}')" class="bg-indigo-600 text-white px-4 py-2 rounded-xl flex-1 font-bold">💾 Guardar cambios</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+
+    window._presupuestosEdicion = presupuestosActuales.map(p => String(p.id));
+
+    window._togglePresupuestoAgrupado = (presId) => {
+        const idx = window._presupuestosEdicion.indexOf(String(presId));
+        if (idx >= 0) window._presupuestosEdicion.splice(idx, 1);
+        window._actualizarListaEdicion(venta);
+    };
+
+    window._agregarPresupuestoAgrupado = (presId) => {
+        if (!window._presupuestosEdicion.includes(String(presId))) {
+            window._presupuestosEdicion.push(String(presId));
+        }
+        window._actualizarListaEdicion(venta);
+    };
+
+    window._actualizarListaEdicion = (v) => {
+        const db2 = getDB();
+        const actuales = window._presupuestosEdicion.map(id => db2.presupuestos.find(p => String(p.id) === String(id))).filter(Boolean);
+        const pendientes2 = (db2.presupuestos || []).filter(p =>
+            p.estado === 'pendiente' &&
+            String(p.clienteId) === String(v.clienteId) &&
+            !window._presupuestosEdicion.includes(String(p.id))
+        );
+        const suma = actuales.reduce((s, p) => s + (p.total || 0), 0);
+        document.getElementById('listaAgrupados').innerHTML = actuales.length ? renderLista(actuales) : '<p class="text-xs text-gray-500">No hay presupuestos.</p>';
+        document.getElementById('listaPendientes').innerHTML = pendientes2.length ? renderPendientes(pendientes2) : '<p class="text-xs text-gray-500">No hay presupuestos pendientes.</p>';
+        document.getElementById('editPresSuma').textContent = '$' + formatNumber(suma);
+        const ajuste = +((v.ocClienteTotal || v.total) - suma).toFixed(2);
+        const spanAjuste = document.getElementById('editPresAjuste');
+        spanAjuste.textContent = (ajuste > 0 ? '+' : '') + '$' + formatNumber(ajuste);
+        spanAjuste.className = Math.abs(ajuste) > 10 ? 'text-red-600 font-bold' : 'text-orange-600 font-bold';
+    };
+};
+
+window._guardarEdicionPresupuestos = async (ventaId) => {
+    const db = getDB();
+    const venta = db.ventas.find(v => String(v.id) === String(ventaId));
+    if (!venta) { mostrarNotificacion('Venta no encontrada', 'error'); return; }
+
+    const nuevosIds = window._presupuestosEdicion || [];
+    if (nuevosIds.length === 0) {
+        mostrarNotificacion('La venta agrupada debe tener al menos 1 presupuesto', 'error');
+        return;
+    }
+
+    const presupuestosNuevos = nuevosIds.map(id => db.presupuestos.find(p => String(p.id) === String(id))).filter(Boolean);
+    const idsAnteriores = (venta.presupuestosOrigenIds || []).map(String);
+    const idsNuevos = nuevosIds.map(String);
+
+    const quitados = idsAnteriores.filter(id => !idsNuevos.includes(id));
+    const agregados = idsNuevos.filter(id => !idsAnteriores.includes(id));
+
+    quitados.forEach(id => {
+        const p = db.presupuestos.find(x => String(x.id) === String(id));
+        if (p) {
+            p.estado = 'pendiente';
+            p.ventaGeneradaId = null;
+            p.fechaAprobacion = null;
+        }
+    });
+
+    agregados.forEach(id => {
+        const p = db.presupuestos.find(x => String(x.id) === String(id));
+        if (p) {
+            p.estado = 'aprobado';
+            p.ventaGeneradaId = venta.id;
+            p.fechaAprobacion = p.fechaAprobacion || hoyISO();
+        }
+    });
+
+    const suma = presupuestosNuevos.reduce((s, p) => s + (p.total || 0), 0);
+    venta.presupuestosOrigenIds = idsNuevos;
+    venta.presupuestosOrigenNumeros = presupuestosNuevos.map(p => p.numero);
+    venta.totalPresupuestos = suma;
+    venta.ajusteRedondeo = +((venta.ocClienteTotal || venta.total) - suma).toFixed(2);
+    venta.items = presupuestosNuevos.map(p => ({
+        descripcion: `Presupuesto ${p.numero} - ${p.trabajo || 'Trabajo'}`,
+        cantidad: 1,
+        precioUnitario: p.total,
+        total: p.total,
+        presupuestoOrigenId: p.id
+    }));
+
+    guardarDB();
+    document.querySelector('.modal')?.remove();
+    mostrarNotificacion(`✅ Presupuestos actualizados (${nuevosIds.length} en la venta)`, 'success');
+    window.dispatchEvent(new Event('refreshView'));
+};
+
+// ==================== 🔥 v7.22.48: GENERAR OC AL TALLER ====================
+window.generarOCAlTaller = async (ventaId) => {
+    window._recalcularTotalTaller = () => {
+        let total = 0;
+        presupuestos.forEach((p, idx) => {
+            const netoInput = document.getElementById(`ocTallerNeto_${idx}`);
+            const ivaInput = document.getElementById(`ocTallerIva_${idx}`);
+            if (netoInput && ivaInput) {
+                const neto = parseFloat(netoInput.value) || 0;
+                const iva = parseFloat(ivaInput.value) || 0;
+                total += (neto + iva);
+            }
+        });
+        const spanTotal = document.getElementById('ocTallerTotal');
+        if (spanTotal) {
+            spanTotal.textContent = '$' + formatNumber(total);
+        } else {
+            console.warn('No se encontró el span ocTallerTotal');
+        }
+    }
+    const db = getDB();
+    const venta = db.ventas.find(v => String(v.id) === String(ventaId));
+    if (!venta || !venta.esVentaAgrupada) {
+        mostrarNotificacion('Venta agrupada no encontrada', 'error');
+        return;
+    }
+
+    const presupuestos = (venta.presupuestosOrigenIds || [])
+        .map(id => db.presupuestos.find(p => String(p.id) === String(id)))
+        .filter(Boolean);
+    if (presupuestos.length === 0) {
+        mostrarNotificacion('No hay presupuestos en esta venta', 'error');
+        return;
+    }
+
+    // Buscar talleres en db.proveedores (o db.empresas)
+    const proveedores = (db.proveedores || []).filter(p => p.tipo === 'taller' || p.esTaller === true || p.nombre?.toLowerCase().includes('taller') || p.nombre?.toLowerCase().includes('forani'));
+    const empresas = (db.empresas || []).filter(e => e.nombre?.toLowerCase().includes('forani') || e.esTaller);
+    const talleres = [...proveedores, ...empresas];
+
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+    modal.innerHTML = `
+        <div class="modal-content w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <h2 class="text-xl font-bold mb-3">📄 Generar OC al Taller</h2>
+            <div class="bg-gray-50 dark:bg-gray-800 p-4 rounded-xl space-y-3 text-sm">
+                <div class="bg-teal-50 dark:bg-teal-900/20 p-2 rounded">
+                    <p class="text-xs">Se generará una OC para el taller con los ítems de <strong>${presupuestos.length} presupuesto(s)</strong> a <strong>precio de costo</strong> (sin markup).</p>
+                    <p class="text-xs mt-1">Referencia: OC cliente <strong>${escapeHtml(venta.ocClienteNumero || 'N/A')}</strong> · Presupuestos: <strong>${(venta.presupuestosOrigenNumeros || []).join(', ')}</strong></p>
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-500 mb-1">Taller / Proveedor:</label>
+                    <select id="ocTallerSelect" class="w-full border rounded-xl px-3 py-1 text-sm" onchange="window._onTallerChange()">
+                        <option value="">-- Cargar datos manualmente --</option>
+                        ${talleres.map(t => `<option value="${t.id}" data-nombre="${escapeHtml(t.nombre || t.razonSocial || '')}" data-cuit="${escapeHtml(t.cuit || '')}" data-direccion="${escapeHtml(t.direccion || '')}" data-telefono="${escapeHtml(t.telefono || '')}" data-email="${escapeHtml(t.email || '')}">${escapeHtml(t.nombre || t.razonSocial || 'Sin nombre')}${t.cuit ? ' - ' + escapeHtml(t.cuit) : ''}</option>`).join('')}
+                    </select>
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1">Nombre / Razón social:</label>
+                        <input type="text" id="ocTallerNombre" placeholder="Grupo Forani" class="w-full border rounded-xl px-3 py-1 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1">CUIT:</label>
+                        <input type="text" id="ocTallerCuit" placeholder="30-XXXXXXXX-X" class="w-full border rounded-xl px-3 py-1 text-sm">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-500 mb-1">Dirección:</label>
+                    <input type="text" id="ocTallerDireccion" class="w-full border rounded-xl px-3 py-1 text-sm">
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1">Teléfono:</label>
+                        <input type="text" id="ocTallerTelefono" class="w-full border rounded-xl px-3 py-1 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1">Email:</label>
+                        <input type="text" id="ocTallerEmail" class="w-full border rounded-xl px-3 py-1 text-sm">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-500 mb-1">Condición de pago:</label>
+                    <input type="text" id="ocTallerCondPago" value="0 DIAS" placeholder="Ej: 0 DIAS, 30 DIAS, TRANSFERENCIA" class="w-full border rounded-xl px-3 py-1 text-sm">
+                </div>
+                <div class="border-t pt-2">
+                    <p class="font-bold mb-2 text-sm">Ajustar valores del taller (Neto + IVA):</p>
+                    <div id="ocTallerItemsEdit" class="space-y-2">
+                        ${presupuestos.map((p, idx) => {
+                            // Valores del taller según los PDFs (hardcodeados temporalmente para este caso)
+                            let netoDefault = 0, ivaDefault = 0;
+                            if (p.trabajo?.includes('DIALISIS')) { netoDefault = 808980.00; ivaDefault = 169885.80; }
+                            else if (p.trabajo?.includes('FULL SERVICE')) { netoDefault = 385717.76; ivaDefault = 81000.73; }
+                            else if (p.trabajo?.includes('REVISIÓN')) { netoDefault = 1913000.00; ivaDefault = 401730.00; }
+                            else {
+                                const totalOriginal = p.totalOriginal || p.costoTotal || p.total || 0;
+                                netoDefault = +(totalOriginal / 1.21).toFixed(2);
+                                ivaDefault = +(totalOriginal - netoDefault).toFixed(2);
+                            }
+                            return `
+                                <div class="flex items-center gap-2 bg-white dark:bg-gray-700 p-2 rounded-lg border">
+                                    <div class="flex-1">
+                                        <p class="text-xs font-bold">${escapeHtml(p.trabajo || 'Trabajo')}</p>
+                                        <p class="text-[10px] text-gray-500">Ref. Taller: ${(() => {
+                                            let ref = p.presupuestoReferenciaNombre || '';
+                                            if (ref) {
+                                                const match = ref.match(/(T\d{4}[-_]?\d{3,4})/i);
+                                                if (match) return match[1].toUpperCase().replace('_', '-');
+                                                return ref.replace(/\.pdf$/i, '');
+                                            }
+                                            if (p.presupuestoReferenciaUrl) {
+                                                const match = p.presupuestoReferenciaUrl.match(/(T\d{4}[-_]?\d{3,4})/i);
+                                                if (match) return match[1].toUpperCase().replace('_', '-');
+                                            }
+                                            return 'S/N';
+                                        })()}</p>
+                                    </div>
+                                    <div>
+                                        <label class="block text-[10px] text-gray-500">Neto $</label>
+                                        <input type="number" step="0.01" id="ocTallerNeto_${idx}" value="${netoDefault}" class="w-24 border rounded px-2 py-1 text-xs text-right" oninput="window._recalcularTotalTaller()">
+                                    </div>
+                                    <div>
+                                        <label class="block text-[10px] text-gray-500">IVA $</label>
+                                        <input type="number" step="0.01" id="ocTallerIva_${idx}" value="${ivaDefault}" class="w-24 border rounded px-2 py-1 text-xs text-right" oninput="window._recalcularTotalTaller()">
+                                    </div>
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                </div>
+                <div class="border-t pt-2 mt-2">
+                    <div class="flex justify-between">
+                        <span class="text-gray-600 dark:text-gray-400">Total a facturar al taller (con IVA):</span>
+                        <strong id="ocTallerTotal">
+                            $${formatNumber(presupuestos.reduce((sum, p, idx) => {
+                                let neto = 0, iva = 0;
+                                if (p.trabajo?.includes('DIALISIS')) { neto = 808980.00; iva = 169885.80; }
+                                else if (p.trabajo?.includes('FULL SERVICE')) { neto = 385717.76; iva = 81000.73; }
+                                else if (p.trabajo?.includes('REVISIÓN')) { neto = 1913000.00; iva = 401730.00; }
+                                else {
+                                    const totalOriginal = p.totalOriginal || p.costoTotal || p.total || 0;
+                                    neto = +(totalOriginal / 1.21).toFixed(2);
+                                    iva = +(totalOriginal - neto).toFixed(2);
+                                }
+                                return sum + neto + iva;
+                            }, 0))}
+                        </strong>
+                    </div>
+                </div>
+            </div>
+            <div class="flex gap-2 mt-4">
+                <button onclick="this.closest('.modal').remove()" class="bg-gray-300 text-gray-700 px-4 py-2 rounded-xl flex-1">Cancelar</button>
+                <button onclick="window._mostrarPreviewOCAlTaller('${venta.id}')" class="bg-blue-600 text-white px-4 py-2 rounded-xl flex-1 font-bold">👁️ Vista previa</button>
+                <button onclick="window._generarPDFOCAlTaller('${venta.id}')" class="bg-teal-600 text-white px-4 py-2 rounded-xl flex-1 font-bold">📄 Generar PDF</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+
+    window._onTallerChange = () => {
+        const sel = document.getElementById('ocTallerSelect');
+        const opt = sel.options[sel.selectedIndex];
+        if (!opt || !opt.value) return;
+        document.getElementById('ocTallerNombre').value = opt.dataset.nombre || '';
+        document.getElementById('ocTallerCuit').value = opt.dataset.cuit || '';
+        document.getElementById('ocTallerDireccion').value = opt.dataset.direccion || '';
+        document.getElementById('ocTallerTelefono').value = opt.dataset.telefono || '';
+        document.getElementById('ocTallerEmail').value = opt.dataset.email || '';
+    ;
+    
+    // Ejecutar después de que el modal se haya renderizado en el DOM
+    setTimeout(() => {
+        window._recalcularTotalTaller();
+    }, 50);
+
+    };
+
+    // El recálculo se hace con _recalcularTotalTaller() que lee los inputs
+    window._recalcularTotalTaller();
+};
+
+window._generarHTMLOCAlTaller = (ventaId) => {
+    const db = getDB();
+    const venta = db.ventas.find(v => String(v.id) === String(ventaId));
+    if (!venta) return '';
+
+    const presupuestos = (venta.presupuestosOrigenIds || [])
+        .map(id => db.presupuestos.find(p => String(p.id) === String(id)))
+        .filter(Boolean);
+
+    const taller = window._datosTallerGuardados || {
+        nombre: (document.getElementById('ocTallerNombre')?.value || '').trim() || 'Taller',
+        cuit: (document.getElementById('ocTallerCuit')?.value || '').trim(),
+        direccion: (document.getElementById('ocTallerDireccion')?.value || '').trim(),
+        telefono: (document.getElementById('ocTallerTelefono')?.value || '').trim(),
+        email: (document.getElementById('ocTallerEmail')?.value || '').trim(),
+        condPago: (document.getElementById('ocTallerCondPago')?.value || '').trim() || '0 DIAS'
+    };
+
+    const empresa = db.datosEmpresa || { nombre: 'SOLUM 360 S.A.S', cuit: '30719583004', direccion: 'Talavera 145', telefono: '3876299440', email: 'Solum.taller@gmail.com' };
+
+    let itemsFilas = '';
+    let totalNeto = 0;
+    let totalIVA = 0;
+
+    presupuestos.forEach((p, idx) => {
+        const netoInput = document.getElementById(`ocTallerNeto_${idx}`);
+        const ivaInput = document.getElementById(`ocTallerIva_${idx}`);
+        
+        let neto = netoInput ? (parseFloat(netoInput.value) || 0) : 0;
+        let iva = ivaInput ? (parseFloat(ivaInput.value) || 0) : 0;
+        
+        if (!netoInput) {
+            const costoTotalConIVA = p.totalOriginal || p.costoTotal || p.total || 0;
+            neto = +(costoTotalConIVA / 1.21).toFixed(2);
+            iva = +(costoTotalConIVA - neto).toFixed(2);
+        }
+        
+        totalNeto += neto;
+        totalIVA += iva;
+
+        let refTaller = p.presupuestoReferenciaNumero || p.presupuestoReferenciaNombre || '';
+        if (refTaller) {
+            const matchNombre = refTaller.match(/(T\d{4}[-_]?\d{3,4})/i);
+            if (matchNombre) {
+                refTaller = matchNombre[1].toUpperCase().replace('_', '-');
+            } else {
+                refTaller = refTaller.replace(/\.pdf$/i, '');
+            }
+        }
+        if (!refTaller && p.presupuestoReferenciaUrl) {
+            const matchUrl = p.presupuestoReferenciaUrl.match(/(T\d{4}[-_]?\d{3,4})/i);
+            if (matchUrl) refTaller = matchUrl[1].toUpperCase().replace('_', '-');
+        }
+        if (!refTaller) refTaller = 'S/N';
+
+        itemsFilas += `
+            <tr>
+                <td style="text-align:center;">1.00</td>
+                <td style="text-align:center;">UNIDAD</td>
+                <td style="text-align:center;">${escapeHtml(p.trabajo || 'Trabajo')}</td>
+                <td style="text-align:center;">${escapeHtml(refTaller)}</td>
+                <td style="text-align:center;">MANROD001</td>
+                <td style="text-align:right;">$ ${formatNumber(neto)}</td>
+                <td style="text-align:right;">$ ${formatNumber(neto)}</td>
+            </tr>
+        `;
+    });
+
+    const total = totalNeto + totalIVA;
+
+    return `<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>OC Taller - ${escapeHtml(taller.nombre)}</title>
+<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+<style>
+  @page { size: A4; margin: 10mm; }
+  body { font-family: Arial, sans-serif; font-size: 11px; color: #000; margin: 0; padding: 10px; }
+  .header { display: flex; justify-content: space-between; margin-bottom: 20px; }
+  .header-left h1 { margin: 0 0 5px 0; font-size: 16px; text-transform: uppercase; }
+  .header-left p { margin: 2px 0; font-size: 11px; }
+  .header-right { text-align: right; }
+  .header-right h2 { margin: 0 0 5px 0; font-size: 18px; text-transform: uppercase; }
+  .header-right p { margin: 2px 0; font-size: 11px; }
+  .receptor { border-top: 2px solid #000; border-bottom: 2px solid #000; padding: 10px 0; margin-bottom: 15px; }
+  .receptor p { margin: 2px 0; font-size: 11px; }
+  .receptor-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
+  
+  table.items { width: 100%; border-collapse: collapse; margin-bottom: 15px; }
+  table.items th { border-top: 1px solid #000; border-bottom: 1px solid #000; padding: 5px; font-size: 10px; text-transform: uppercase; text-align: left; }
+  table.items td { padding: 5px; font-size: 11px; border-bottom: 1px dashed #ccc; }
+  
+  .obs-box { margin-bottom: 15px; font-size: 11px; }
+  .obs-box p { margin: 4px 0; }
+  
+  .footer-totales { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 20px; }
+  .barcode { display: flex; flex-direction: column; align-items: flex-start; }
+  .barcode svg { height: 50px; }
+  
+  table.totales { width: 300px; border-collapse: collapse; }
+  table.totales td { padding: 4px; font-size: 11px; }
+  table.totales td.label { text-align: left; }
+  table.totales td.amount { text-align: right; }
+  table.totales tr.total-final td { font-weight: bold; font-size: 13px; border-top: 1px solid #000; border-bottom: 1px solid #000; padding: 6px 4px; }
+  
+  .no-print { margin-top: 30px; text-align: center; }
+  .no-print button { padding: 10px 25px; background: #0a2a4a; color: white; border: none; border-radius: 4px; font-size: 13px; cursor: pointer; margin: 0 5px; }
+  .no-print button.gray { background: #6b7280; }
+  @media print {
+    .no-print { display: none !important; }
+    body { padding: 0; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <!-- IZQUIERDA: Datos de SOLUM (Empresa) -->
+  <div class="header-left">
+    <h1>${escapeHtml(empresa.nombre || 'Mi Empresa')}</h1>
+    <p>${empresa.cuit ? 'C.U.I.T.: ' + escapeHtml(empresa.cuit) : ''}</p>
+  </div>
+  
+  <!-- CENTRO: Recuadro "P" -->
+  <div class="header-center" style="display: flex; align-items: center; justify-content: center; padding: 0 20px;">
+    <div style="border: 3px solid #000; width: 60px; height: 60px; display: flex; align-items: center; justify-content: center; font-size: 36px; font-weight: bold; font-family: Arial, sans-serif;">
+      P
+    </div>
+  </div>
+
+  <!-- DERECHA: Datos de la OC -->
+  <div class="header-right">
+    <h2>Orden de compra No Productivo</h2>
+    <p style="font-size: 16px; font-weight: bold;">OC ${escapeHtml(venta.ocClienteNumero || venta.id)}</p>
+    <p>Emisión: ${(() => { const d = new Date(); return `${String(d.getDate()).padStart(2,'0')}-${String(d.getMonth()+1).padStart(2,'0')}-${d.getFullYear()}`; })()}</p>
+  </div>
+</div>
+
+<!-- RECUADRO: Datos del Taller -->
+<div class="receptor">
+  <div class="receptor-grid">
+    <div>
+      <p><strong>Sr./es:</strong> ${escapeHtml(taller.nombre)}</p>
+      <p><strong>Entrega:</strong> ${escapeHtml(taller.direccion || '')}</p>
+      <p><strong>Dirección:</strong> ${escapeHtml(taller.direccion || '')}, Argentina</p>
+    </div>
+    <div>
+      <p><strong>C.U.I.T.:</strong> ${escapeHtml(taller.cuit || '')} | <strong>I.V.A.:</strong> Responsable Inscripto</p>
+      <p><strong>Cond.:</strong> ${escapeHtml(taller.condPago || '0 DIAS')}</p>
+    </div>
+  </div>
+</div>
+
+<table class="items">
+  <thead>
+    <tr>
+      <th style="width: 50px; text-align: center;">CANT.</th>
+      <th style="width: 60px; text-align: center;">PRES.</th>
+      <th>DESCRIPCION</th>
+      <th style="width: 80px; text-align: center;">CODIGO</th>
+      <th style="width: 80px; text-align: center;">COD. PRO.</th>
+      <th style="width: 90px; text-align: right;">PRECIO</th>
+      <th style="width: 90px; text-align: right;">IMPORTE</th>
+    </tr>
+  </thead>
+  <tbody>
+    ${itemsFilas}
+  </tbody>
+</table>
+
+<div class="obs-box">
+  <p><strong>Observaciones:</strong> ${(() => {
+      const patentes = [...new Set(presupuestos.map(p => p.patente).filter(Boolean))];
+      return patentes.length > 0 ? 'DOMINIO ' + patentes.join(' / ') : 'Sin dominio especificado';
+  })()}</p>
+  <p style="font-size: 9px; margin-top: 10px;"><strong>IMPORTANTE:</strong> Sr. Proveedor, se solicita verifiquen las presentaciones y precios detallados en las ordenes de compra enviadas. Deberan informar las diferencias via mail dentro de las 24 hs de recibida la orden, con el fin de no tener inconvenientes o retrasos al momento de la entrega y de emision de pagos. Los pagos se emitiran basados en las ordenes de compra confeccionadas. RESPETAR FECHA Y HORARIO DE ENTREGA, CASO CONTRARIO SE RECHAZARA LA MERCADERIA</p>
+</div>
+
+<div class="footer-totales">
+  <div class="barcode">
+    <svg id="barcode-oc"></svg>
+  </div>
+  
+  <table class="totales">
+    <tr><td class="label">Descuentos</td><td class="amount">$ 0.00</td></tr>
+    <tr><td class="label">SUBTOTAL</td><td class="amount">$ ${formatNumber(totalNeto)}</td></tr>
+    <tr><td class="label">IVA 21%</td><td class="amount">$ ${formatNumber(totalIVA)}</td></tr>
+    <tr class="total-final"><td class="label">TOTAL</td><td class="amount">$ ${formatNumber(total)}</td></tr>
+  </table>
+</div>
+
+<div class="no-print">
+  <button onclick="window._imprimirOCAlTallerSinEncabezados()" data-num-oc="${escapeHtml(venta.ocClienteNumero || 'sin_numero')}">🖨️ Imprimir / Guardar PDF</button>
+  <button class="gray" onclick="window.close()">Cerrar</button>
+</div>
+
+<script>
+  // 🔥 Función para imprimir sin encabezados usando html2pdf
+  window._imprimirOCAlTallerSinEncabezados = async () => {
+    try {
+      const elemento = document.body;
+      // Usar el número de OC del botón
+      const btn = document.querySelector('[data-num-oc]');
+      const numOC = btn ? btn.dataset.numOc : 'sin_numero';
+      
+      const opt = {
+        margin: 0,
+        filename: 'OC_Taller_' + numOC + '.pdf',
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true, logging: false },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+      };
+      
+      // Ocultar los botones antes de generar el PDF
+      const noPrint = document.querySelector('.no-print');
+      if (noPrint) noPrint.style.display = 'none';
+      
+      const pdfBlob = await html3pdf().set(opt).from(elemento).outputPdf('blob');
+      
+      // Mostrar los botones de nuevo
+      if (noPrint) noPrint.style.display = 'block';
+      
+      const url = URL.createObjectURL(pdfBlob);
+      window.open(url, '_blank');
+    } catch (err) {
+      console.error('Error al generar PDF:', err);
+      alert('Error al generar PDF: ' + err.message);
+    }
+  };
+</script>
+
+<script>
+  if (typeof JsBarcode !== 'undefined') {
+    JsBarcode("#barcode-oc", "OC-${venta.id}", {
+      format: "CODE128",
+      lineColor: "#000",
+      width: 1.5,
+      height: 40,
+      displayValue: true
+    });
+  }
+</script>
+
+</body>
+</html>`;
+};
+
+window._mostrarPreviewOCAlTaller = (ventaId) => {
+    // Guardar los datos actuales del formulario
+    window._datosTallerGuardados = {
+        nombre: document.getElementById('ocTallerNombre')?.value.trim() || 'Taller',
+        cuit: document.getElementById('ocTallerCuit')?.value.trim(),
+        direccion: document.getElementById('ocTallerDireccion')?.value.trim(),
+        telefono: document.getElementById('ocTallerTelefono')?.value.trim(),
+        email: document.getElementById('ocTallerEmail')?.value.trim(),
+        condPago: document.getElementById('ocTallerCondPago')?.value.trim() || '0 DIAS',
+    };
+
+    const html = window._generarHTMLOCAlTaller(ventaId);
+    if (!html) { mostrarNotificacion('Error al generar la vista previa', 'error'); return; }
+
+    // Extraer solo el body y los estilos
+    let bodyContent = html;
+    const bodyMatch = html.match(/<body[^>]*>([\s\S]*)<\/body>/i);
+    if (bodyMatch) bodyContent = bodyMatch[1];
+    
+    let estilos = '';
+    const styleMatch = html.match(/<style>([\s\S]*?)<\/style>/i);
+    if (styleMatch) estilos = styleMatch[1];
+
+    // Crear un NUEVO overlay limpio (sin blur)
+    const overlay = document.createElement('div');
+    overlay.id = 'previewOverlayOC';
+    overlay.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); z-index: 9999; display: flex; align-items: center; justify-content: center; padding: 20px;';
+    
+    overlay.innerHTML = `
+        <div style="background: white; border-radius: 1rem; width: 100%; max-width: 800px; max-height: 90vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);">
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 15px; border-bottom: 1px solid #eee; background: #f9fafb;">
+                <h2 style="font-size: 1.1rem; font-weight: bold; margin: 0;">👁️ Vista previa - OC al Taller</h2>
+                <button onclick="document.getElementById('previewOverlayOC').remove();" style="background: #e5e7eb; color: #374151; border: none; padding: 6px 12px; border-radius: 8px; cursor: pointer; font-size: 0.85rem;">← Volver</button>
+            </div>
+            
+            <div style="flex: 1; overflow-y: auto; padding: 20px; background: white;">
+                <style>${estilos}</style>
+                ${bodyContent}
+            </div>
+            
+            <div style="padding: 15px; border-top: 1px solid #eee; background: #f9fafb; display: flex; gap: 10px;">
+                <button onclick="document.getElementById('previewOverlayOC').remove();" style="flex: 1; background: #e5e7eb; color: #374151; border: none; padding: 10px; border-radius: 8px; cursor: pointer; font-weight: bold;">← Volver</button>
+                <button onclick="window._imprimirOCAlTallerDesdeOverlay()" style="flex: 1; background: #0d9488; color: white; border: none; padding: 10px; border-radius: 8px; cursor: pointer; font-weight: bold;">🖨️ Imprimir / Guardar PDF</button>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(overlay);
+};
+
+window._imprimirOCAlTallerDesdeOverlay = () => {
+    // Generar el HTML de nuevo para imprimir en ventana nueva
+    const ventaIdMatch = document.querySelector('button[onclick*="_mostrarPreviewOCAlTaller"]')?.getAttribute('onclick')?.match(/'([^']+)'/);
+    const ventaId = ventaIdMatch ? ventaIdMatch[1] : null;
+    
+    if (!ventaId) { mostrarNotificacion('No se pudo identificar la venta', 'error'); return; }
+    
+    const html = window._generarHTMLOCAlTaller(ventaId);
+    if (!html) return;
+    
+    const ventana = window.open('', '_blank', 'width=900,height=700');
+    ventana.document.write(html);
+    ventana.document.close();
+    setTimeout(() => ventana.print(), 500);
+};
+
+window._volverFormularioOCAlTaller = () => {
+    const modalContent = document.querySelector('.modal-content');
+    const modalPadre = document.querySelector('.modal');
+    if (modalContent && window._modalOcTallerOriginalHTML) {
+        modalContent.innerHTML = window._modalOcTallerOriginalHTML;
+        window._modalOcTallerOriginalHTML = null;
+        
+        // Restaurar fondo
+        if (modalPadre) {
+            modalPadre.style.background = window._modalOcTallerOriginalBg || 'rgba(0,0,0,0.6)';
+            modalPadre.style.backdropFilter = window._modalOcTallerOriginalBlur || 'blur(4px)';
+            modalPadre.style.webkitBackdropFilter = window._modalOcTallerOriginalBlur || 'blur(4px)';
+        }
+    }
+};
+
+window._imprimirOCAlTaller = () => {
+    // Crear una ventana nueva con el HTML de la OC para imprimir
+    const html = window._generarHTMLOCAlTaller(
+        // Buscar el ventaId desde el modal actual
+        (() => {
+            const btn = document.querySelector('button[onclick*="_generarPDFOCAlTaller"]');
+            if (btn) {
+                const match = btn.getAttribute('onclick').match(/'([^']+)'/);
+                return match ? match[1] : null;
+            }
+            return null;
+        })()
+    );
+    if (!html) {
+        mostrarNotificacion('Error al generar el PDF para imprimir', 'error');
+        return;
+    }
+    
+    const ventana = window.open('', '_blank', 'width=900,height=700');
+    ventana.document.write(html);
+    ventana.document.close();
+    setTimeout(() => ventana.print(), 500);
+};
+
+window._volverFormularioOCAlTaller = () => {
+    const modalContent = document.querySelector('.modal-content');
+    if (modalContent && window._modalOcTallerOriginalHTML) {
+        modalContent.innerHTML = window._modalOcTallerOriginalHTML;
+        window._modalOcTallerOriginalHTML = null;
+    }
+};
+
+window._imprimirOCAlTaller = () => {
+    const iframe = document.getElementById('iframeOCAlTaller');
+    if (iframe && iframe.contentWindow) {
+        iframe.contentWindow.print();
+    }
+};
+
+window._guardarProveedorDesdeOC = (taller) => {
+    if (!taller || !taller.nombre) return;
+    const db = getDB();
+    if (!db.proveedores) db.proveedores = [];
+    
+    // Buscar si ya existe (por CUIT o por nombre)
+    const existe = db.proveedores.find(p => 
+        (taller.cuit && p.cuit && p.cuit.replace(/[^0-9]/g, '') === taller.cuit.replace(/[^0-9]/g, '')) ||
+        (p.nombre && p.nombre.toLowerCase() === taller.nombre.toLowerCase())
+    );
+    
+    if (!existe) {
+        // Crear nuevo proveedor
+        db.proveedores.push({
+            id: generarId(),
+            nombre: taller.nombre,
+            cuit: taller.cuit || '',
+            direccion: taller.direccion || '',
+            telefono: taller.telefono || '',
+            email: taller.email || '',
+            tipo: 'taller',
+            esTaller: true,
+            fechaCreacion: new Date().toISOString()
+        });
+        guardarDB();
+        console.log('✅ Proveedor guardado automáticamente:', taller.nombre);
+    } else {
+        // Actualizar datos si faltaban
+        let modificado = false;
+        if (!existe.direccion && taller.direccion) { existe.direccion = taller.direccion; modificado = true; }
+        if (!existe.telefono && taller.telefono) { existe.telefono = taller.telefono; modificado = true; }
+        if (!existe.email && taller.email) { existe.email = taller.email; modificado = true; }
+        if (!existe.cuit && taller.cuit) { existe.cuit = taller.cuit; modificado = true; }
+        
+        if (modificado) {
+            guardarDB();
+            console.log('✅ Proveedor actualizado con nuevos datos:', taller.nombre);
+        }
+    }
+};
+
+window._generarPDFOCAlTaller = async (ventaId) => {
+    // 1. Guardar los datos del formulario antes de generar
+    window._datosTallerGuardados = {
+        nombre: document.getElementById('ocTallerNombre')?.value.trim() || 'Taller',
+        cuit: document.getElementById('ocTallerCuit')?.value.trim(),
+        direccion: document.getElementById('ocTallerDireccion')?.value.trim(),
+        telefono: document.getElementById('ocTallerTelefono')?.value.trim(),
+        email: document.getElementById('ocTallerEmail')?.value.trim(),
+        condPago: document.getElementById('ocTallerCondPago')?.value.trim() || '0 DIAS'
+    };
+    
+    // Guardar en proveedores si no existe
+    window._guardarProveedorDesdeOC(window._datosTallerGuardados);
+
+    const html = window._generarHTMLOCAlTaller(ventaId);
+    if (!html) { mostrarNotificacion('Error al generar el PDF', 'error'); return; }
+
+    // 2. Abrir el PDF en una nueva ventana (para imprimir/guardar)
+    const ventana = window.open('', '_blank', 'width=900,height=700');
+    ventana.document.write(html);
+    ventana.document.close();
+
+    // 3. Guardar el PDF en Storage y vincularlo a la venta
+    try {
+        const db = getDB();
+        const venta = db.ventas.find(v => String(v.id) === String(ventaId));
+        if (venta) {
+            // Convertir el HTML a un Blob de tipo PDF (en realidad es HTML, pero lo guardamos como .html)
+            // Nota: Para un PDF real habría que usar una librería como jsPDF o html2pdf, pero por ahora guardamos el HTML.
+            const blob = new Blob([html], { type: 'text/html' });
+            const file = new File([blob], `OC_Taller_${venta.ocClienteNumero || venta.id}.html`, { type: 'text/html' });
+            
+            // Subir a Storage
+            const { subirArchivo } = await import('./firebase.js');
+            const rutaStorage = `presupuestos/oc_taller_${ventaId}.html`;
+            const url = await subirArchivo(rutaStorage, file);
+            
+            // Guardar el link en la venta
+            venta.ocTallerUrl = url;
+            venta.ocTallerNombre = file.name;
+            venta.ocTallerFecha = new Date().toISOString();
+            guardarDB();
+            
+            mostrarNotificacion('✅ OC al taller generada y guardada', 'success');
+        }
+    } catch (err) {
+        console.error('Error al guardar la OC en Storage:', err);
+        mostrarNotificacion('⚠️ OC generada, pero no se pudo guardar en el registro', 'warning');
+    }
+
+    document.querySelector('.modal')?.remove();
+};
+
+// ==================== 🔥 v7.23.6: MANEJO DE ARCHIVO FACTURA ====================
+window._archivoFacturaSeleccionado = null;
+
+window._onFacturaFileChange = (input) => {
+    console.log('📎 _onFacturaFileChange llamado');
+    const file = input.files[0];
+    if (!file) {
+        window._quitarFactura();
+        return;
+    }
+    console.log('📎 Archivo seleccionado:', file.name);
+    window._archivoFacturaSeleccionado = file;
+    
+    const nombreSpan = document.getElementById('nombreFacturaFile');
+    const previewDiv = document.getElementById('previewFacturaContainer');
+    const previewNombre = document.getElementById('previewFacturaNombre');
+    
+    if (nombreSpan) nombreSpan.textContent = file.name;
+    if (previewDiv) previewDiv.classList.remove('hidden');
+    if (previewNombre) previewNombre.textContent = file.name;
+
+    const btnVer = document.getElementById('btnVerFactura');
+    const btnQuitar = document.getElementById('btnQuitarFactura');
+    
+    if (btnVer) {
+        btnVer.onclick = () => {
+            const url = URL.createObjectURL(file);
+            window.open(url, '_blank');
+            setTimeout(() => URL.revokeObjectURL(url), 5000);
+        };
+    }
+    
+    if (btnQuitar) {
+        btnQuitar.onclick = () => {
+            window._quitarFactura();
+        };
+    }
+};
+
+window._quitarFactura = () => {
+    window._archivoFacturaSeleccionado = null;
+    const input = document.getElementById('facturaFile');
+    const nombreSpan = document.getElementById('nombreFacturaFile');
+    const previewDiv = document.getElementById('previewFacturaContainer');
+    
+    if (input) input.value = '';
+    if (nombreSpan) nombreSpan.textContent = 'Ningún archivo seleccionado';
+    if (previewDiv) previewDiv.classList.add('hidden');
+};
+
+// ==================== 🔥 v7.24.4: MANEJO DE COMPROBANTE DE PAGO ====================
+window._archivoComprobanteSeleccionado = null;
+
+window._onComprobanteFileChange = function(input) {
+    const file = input.files && input.files[0];
+    const nombreSpan = document.getElementById('nombreComprobanteFile');
+    const previewDiv = document.getElementById('previewComprobanteContainer');
+    const previewNombre = document.getElementById('previewComprobanteNombre');
+    
+    if (!previewDiv) {
+        console.warn('⚠️ No se encontró previewComprobanteContainer');
+        return;
+    }
+    
+    if (!file) {
+        if (nombreSpan) nombreSpan.textContent = 'Ningún archivo seleccionado';
+        if (previewDiv) previewDiv.classList.add('hidden');
+        return;
+    }
+    
+    if (nombreSpan) nombreSpan.textContent = file.name;
+    if (previewNombre) previewNombre.textContent = file.name;
+    if (previewDiv) previewDiv.classList.remove('hidden');
+    
+    const btnVer = document.getElementById('btnVerComprobante');
+    if (btnVer) {
+        btnVer.onclick = () => {
+            const url = URL.createObjectURL(file);
+            window.open(url, '_blank');
+            setTimeout(() => URL.revokeObjectURL(url), 5000);
+        };
+    }
+    
+    const btnQuitar = document.getElementById('btnQuitarComprobante');
+    if (btnQuitar) {
+        btnQuitar.onclick = () => {
+            input.value = '';
+            if (nombreSpan) nombreSpan.textContent = 'Ningún archivo seleccionado';
+            if (previewDiv) previewDiv.classList.add('hidden');
+        };
+    }
+};
+
+window._quitarComprobante = () => {
+    const input = document.getElementById('comprobanteFile');
+    const nombreSpan = document.getElementById('nombreComprobanteFile');
+    const previewDiv = document.getElementById('previewComprobanteContainer');
+    if (input) input.value = '';
+    if (nombreSpan) nombreSpan.textContent = 'Ningún archivo seleccionado';
+    if (previewDiv) previewDiv.classList.add('hidden');
 };

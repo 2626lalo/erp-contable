@@ -3,7 +3,7 @@
 // v7.16.15 - Network-first para HTML/JS, auto-actualización, cache-first para assets
 // El CACHE_VERSION se bumpea en cada deploy importante.
 
-const CACHE_VERSION = 'v7_21_6';
+const CACHE_VERSION = 'v7_24_25';
 const CACHE_NAME = `erp-contable-${CACHE_VERSION}`;
 const urlsToCache = ['/', '/index.html', '/manifest.json', '/styles.css', '/version.json'];
 

@@ -11,8 +11,7 @@ import {
 } from './db.js';
 import {
     formatNumber, formatDate, mostrarNotificacion, validarDatosEsenciales,
-    escapeHtml, inputFechaHTML, initInputFecha, getValorFecha
-} from './utils.js';
+    escapeHtml, inputFechaHTML, initInputFecha, getValorFecha, confirmarAccion} from './utils.js';
 import { crearModal, cerrarModal, METODOS_PAGO } from './configuracion/helpers.js';
 
 // ==================== FUNCIÓN DE CIERRE AUTOMÁTICO ====================
@@ -653,8 +652,8 @@ function renderVencimientos(db, hoy) {
 }
 
 // ==================== CERRAR MES ====================
-window.cerrarMesActual = () => {
-    if (!confirm('¿Guardar el cierre del mes actual? Esto creará un snapshot del saldo y movimientos del mes.')) return;
+window.cerrarMesActual = async () => {
+    if (!(await confirmarAccion({ titulo: '📅 Cerrar mes', mensaje: '¿Guardar el cierre del mes actual? Esto creará un snapshot del saldo y movimientos del mes.', textoConfirmar: '📅 Sí, cerrar', icono: '📅' }))) return;
     const result = cerrarMesAutomatico();
     if (result) {
         mostrarNotificacion('✅ Cierre de mes guardado correctamente', 'success');

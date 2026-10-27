@@ -3,7 +3,7 @@
 // ERP Contable Argentina - v7.0.0
 
 import { getDB, guardarDB } from './db.js';
-import { formatNumber, escapeHtml, formatDate, mostrarNotificacion, generarId, inputFechaHTML, initInputFecha, getValorFecha, parseFechaLocal} from './utils.js';
+import { formatNumber, escapeHtml, formatDate, mostrarNotificacion, generarId, inputFechaHTML, initInputFecha, getValorFecha, parseFechaLocal, confirmarAccion} from './utils.js';
 
 // ==================== HELPERS DE PATENTE ====================
 
@@ -726,7 +726,7 @@ window.editarUnidadUI = (patente) => {
 
 // ==================== ELIMINAR UNIDAD ====================
 
-window.eliminarUnidadUI = (patente) => {
+window.eliminarUnidadUI = async (patente) => {
     const unidad = buscarUnidadPorPatente(patente);
     if (!unidad) { mostrarNotificacion('Unidad no encontrada', 'error'); return; }
 
@@ -737,7 +737,7 @@ window.eliminarUnidadUI = (patente) => {
         ? `⚠️ Esta unidad tiene ${historial.presupuestos.length} presupuesto(s) asociado(s).\n\nSi la eliminás, los presupuestos NO se borran, pero dejás de verlos agrupados en esta unidad.\n\n¿Eliminar de todos modos?`
         : `¿Eliminar la unidad ${formatearPatente(patente)}?`;
 
-    if (!confirm(mensaje)) return;
+    if (!(await confirmarAccion({ titulo: '⚠️ Confirmar', mensaje: mensaje, textoConfirmar: '✅ Sí, confirmar', icono: '⚠️' }))) return;
 
     const db = getDB();
     db.unidades = (db.unidades || []).filter(u => normalizarPatente(u.patente) !== normalizarPatente(patente));
@@ -1021,8 +1021,8 @@ window.toggleVistaUnidades = () => {
     window.showView('unidades');
 };
 
-window.migrarUnidadesDesdePresupuestosUI = () => {
-    if (!confirm('¿Crear unidades a partir de los presupuestos existentes?')) return;
+window.migrarUnidadesDesdePresupuestosUI = async () => {
+    if (!(await confirmarAccion({ titulo: '📦 Crear unidades', mensaje: '¿Crear unidades a partir de los presupuestos existentes?', textoConfirmar: '📦 Sí, crear', icono: '📦' }))) return;
     const creadas = migrarUnidadesDesdePresupuestos();
     mostrarNotificacion(`✅ ${creadas} unidad(es) creada(s)`, 'success');
     window.showView('unidades');

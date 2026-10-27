@@ -52,12 +52,25 @@ export function generarHTMLPresupuestoCompleto(p) {
         acumuladoNeto += subtotalNeto;
         acumuladoIVA += ivaLinea;
 
-        // Agrupación para el resumen del pie (por categoría, en neto)
-        if (item.esPropio) { totalPropios += subtotalNeto; }
-        else if (item.tipo === 'mano_obra') { totalManoObra += subtotalNeto; }
-        else if (item.tipo === 'servicio') { totalMecanica += subtotalNeto; }
-        else if (item.tipo === 'producto') { totalRepuestos += subtotalNeto; }
-        else { totalOtros += subtotalNeto; }
+        // 🔥 v7.24.23: Sumar el IMPORTE CON IVA (no el neto) para el desglose
+        const subtotalConIVA = precioUnitConIVA * cant;
+        const accion = (item.accion || '').trim().toUpperCase();
+        
+        if (accion.startsWith('MO') || item.tipo === 'mano_obra') {
+            totalManoObra += subtotalConIVA;
+        } else if (accion.startsWith('REP')) {
+            totalRepuestos += subtotalConIVA;
+        } else if (accion.startsWith('M')) {
+            totalManoObra += subtotalConIVA;
+        } else if (accion.startsWith('S')) {
+            totalMecanica += subtotalConIVA;
+        } else if (accion.startsWith('O')) {
+            totalOtros += subtotalConIVA;
+        } else {
+            // C, R, o vacío → Repuestos
+            totalRepuestos += subtotalConIVA;
+        }
+        if (item.esPropio) totalPropios += subtotalConIVA;
 
         // 🔥 Acción: solo la inicial (ej: "C - Cambiar" → "C")
         const accionCorta = (item.accion || '').split(' - ')[0].trim();
@@ -72,7 +85,8 @@ export function generarHTMLPresupuestoCompleto(p) {
     });
     const subtotalNetoRedondeado = acumuladoNeto;
     const ivaRedondeado = acumuladoIVA;
-    const totalFinal = acumuladoNeto + acumuladoIVA;
+    // 🔥 v7.24.24: Redondear el total para que coincida con la suma de importes
+    const totalFinal = Math.round(acumuladoNeto + acumuladoIVA);
 
     const itemsHTML = itemsFilas.map(f => {
         // Calcular IVA de la línea (21% del neto)
@@ -246,12 +260,14 @@ ${p.trabajo ? `<div class="trabajo-linea"><strong>Trabajo:</strong> ${escapeHtml
   </tbody>
 </table>
 
-<!-- Totales (formato GF AutoCenter) -->
+<!-- Totales (formato GF AutoCenter con desglose) -->
 <table class="totales">
-  <tr><td>Repuestos:</td><td class="text-right">$ ${formatNumber(totalFinal)}</td></tr>
+  ${totalRepuestos > 0 ? `<tr><td>Repuestos:</td><td class="text-right">$ ${formatNumber(totalRepuestos)}</td></tr>` : ''}
+  ${totalManoObra > 0 ? `<tr><td>Mano de obra:</td><td class="text-right">$ ${formatNumber(totalManoObra)}</td></tr>` : ''}
+  ${totalOtros > 0 ? `<tr><td>Otros:</td><td class="text-right">$ ${formatNumber(totalOtros)}</td></tr>` : ''}
   <tr><td>Subtotal:</td><td class="text-right">$ ${formatNumber(totalFinal)}</td></tr>
   <tr><td>Neto:</td><td class="text-right">$ ${formatNumber(subtotalNetoRedondeado)}</td></tr>
-  <tr><td>IVA 21%:</td><td class="text-right">$ ${formatNumber(ivaRedondeado)}</td></tr>
+  <tr><td>IVA 21%:</td><td class="text-right">$ ${formatNumber(acumuladoIVA)}</td></tr>
   <tr class="total-final"><td>Total:</td><td class="text-right">$ ${formatNumber(totalFinal)}</td></tr>
 </table>
 

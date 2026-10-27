@@ -6,7 +6,8 @@
 import {
     getDB, getImpuestosActivos, guardarDB,
     calcularCajaReal, calcularImpuestoChequeMes, calcularIVAMes,
-    calcularImpuestoChequeAnual
+    calcularImpuestoChequeAnual,
+    getCierreAnual, guardarCierreAnual, obtenerSaldosArrastrados
 } from './db.js';
 import {
     formatNumber, mostrarNotificacion, formatDate, escapeHtml,
@@ -517,6 +518,8 @@ function renderAnioFiscal() {
 
     return `
         <div class="space-y-4 pb-6">
+            <!-- 🔥 v7.22.35: banner de estado del año (cerrado/abierto + saldos arrastrados) -->
+            ${window.renderBannerEstadoAnio(anioActual)}
             <!-- VENTAS Y COMPRAS -->
             <div class="bg-white dark:bg-gray-800 rounded-2xl shadow overflow-hidden">
                 <div class="bg-gradient-to-r from-green-500 to-teal-600 px-4 py-2 font-bold text-white">
@@ -1061,6 +1064,75 @@ window.exportarResumenAnualCSV = () => {
     mostrarNotificacion('📥 Resumen anual exportado', 'success');
 };
 
+
+// ==================== 🔥 v7.22.35: CALCULAR SNAPSHOT ANUAL ====================
+
+/**
+ * Calcula todos los valores del año fiscal para guardar en el cierre.
+ * @param {string|number} anio - Año fiscal (ej: 2026)
+ * @returns {object} - Snapshot con todos los cálculos del año
+ */
+function calcularSnapshotAnual(anio) {
+    const db = getDB();
+    const anioStr = String(anio);
+    const ventasAnio = (db.ventas || []).filter(v => (v.fechaVenta || v.fecha || '').startsWith(anioStr));
+    const comprasAnio = (db.compras || []).filter(c => (c.fechaEmision || c.fecha || '').startsWith(anioStr));
+    const movsAnio = (db.movimientos || []).filter(m => (m.fecha || '').startsWith(anioStr));
+    
+    // Ventas
+    const ventasBrutas = ventasAnio.reduce((s, v) => s + (v.total || 0), 0);
+    const ventasNetas = +(ventasBrutas / 1.21).toFixed(2);
+    
+    // Compras por tipo
+    const comprasA = comprasAnio.filter(c => c.tipoFactura === 'A');
+    const comprasB = comprasAnio.filter(c => c.tipoFactura === 'B');
+    const comprasC = comprasAnio.filter(c => c.tipoFactura === 'C' || c.tipoFactura === 'SIN');
+    
+    const facturaA = comprasA.reduce((s, c) => s + (c.total || 0), 0);
+    const facturaB = comprasB.reduce((s, c) => s + (c.total || 0), 0);
+    const facturaC = comprasC.reduce((s, c) => s + (c.total || 0), 0);
+    
+    // IVA
+    const ivaVentas = +(ventasBrutas - ventasNetas).toFixed(2);
+    const ivaCompras = +(facturaA - (facturaA / 1.21)).toFixed(2);
+    const ivaAPagar = +(ivaVentas - ivaCompras).toFixed(2);
+    const saldoTecnico = ivaAPagar < 0 ? Math.abs(ivaAPagar) : 0;
+    
+    // Impuesto al Cheque
+    const impDebitos = movsAnio.filter(m => m.tipo === 'egreso' && m.impuestoDebitoCredito?.aplica)
+        .reduce((s, m) => s + (m.impuestoDebitoCredito?.monto || 0), 0);
+    const impCreditos = movsAnio.filter(m => m.tipo === 'ingreso' && m.impuestoDebitoCredito?.aplica)
+        .reduce((s, m) => s + (m.impuestoDebitoCredito?.monto || 0), 0);
+    const impTotal = +(impDebitos + impCreditos).toFixed(2);
+    
+    // IIBB + TISSH
+    const iibb = +(ventasNetas * 0.036).toFixed(2);
+    const tissh = +(ventasNetas * 0.005).toFixed(2);
+    
+    // Ganancias
+    const costoGanancias = facturaA - ivaCompras + facturaB + facturaC;
+    const aranceles = 0;
+    const utilidadAntes = +(ventasNetas - costoGanancias - aranceles - iibb - tissh - impTotal).toFixed(2);
+    const ganancias = +(utilidadAntes * 0.25).toFixed(2);
+    const reservaLegal = +(utilidadAntes * 0.05).toFixed(2);
+    const gananciaNeta = +(utilidadAntes - ganancias - reservaLegal).toFixed(2);
+    
+    // Impuesto a las Ganancias a pagar (con descuento de impuesto al cheque)
+    const impuestoGananciasAPagar = +(ganancias - impTotal).toFixed(2);
+    
+    return {
+        anio: anioStr,
+        fechaCierre: hoyISO(),
+        ventas: { brutas: ventasBrutas, netas: ventasNetas, cantidad: ventasAnio.length },
+        compras: { facturaA, facturaB, facturaC, total: +(facturaA + facturaB + facturaC).toFixed(2), costoGanancias: +costoGanancias.toFixed(2) },
+        iva: { ivaVentas, ivaCompras, ivaAPagar, saldoTecnico },
+        impuestoCheque: { debitos: +impDebitos.toFixed(2), creditos: +impCreditos.toFixed(2), total: impTotal },
+        iibb, tissh,
+        ganancias: { utilidadAntes, ganancias, reservaLegal, gananciaNeta },
+        impuestoGananciasAPagar
+    };
+}
+
 // ==================== 🔥 v7.17.3: FUNCIONES DE COSTOS FIJOS DESDE DASHBOARD ====================
 
 // Redirige a Configuración → Costos Fijos y abre el modal de edición
@@ -1128,4 +1200,249 @@ window.recargarCostoFijo = (costoId) => {
     guardarDB();
     mostrarNotificacion(`✅ Costo fijo recargado: ${costo.nombre} - $${formatNumber(monto)}`, 'success');
     window.dispatchEvent(new Event('refreshView'));
+};
+
+// ==================== 🔥 v7.22.35: CIERRE ANUAL ====================
+
+/**
+ * Cierra el año fiscal: toma snapshot, guarda en db.cierresAnuales[] y genera PDF.
+ */
+window.cerrarAnioFiscal = async (anio) => {
+    const db = getDB();
+    const anioStr = String(anio);
+    const ventasAnio = (db.ventas || []).filter(v => (v.fechaVenta || v.fecha || '').startsWith(anioStr));
+    
+    if (ventasAnio.length === 0) {
+        mostrarNotificacion(`No hay datos del año ${anioStr} para cerrar`, 'warning');
+        return;
+    }
+    
+    const confirmado = await confirmarAccion({
+        titulo: `🔒 Cerrar Año Fiscal ${anioStr}`,
+        mensaje: `Se va a generar un <strong>snapshot</strong> de todos los cálculos del año ${anioStr} y se va a guardar como cierre anual.<br><br>` +
+            `<strong>Ventas del año:</strong> ${ventasAnio.length}<br><br>` +
+            `Los datos <strong>NO se borran</strong>. Podés seguir consultándolos, pero queda registrado el cierre.`,
+        textoConfirmar: `🔒 Sí, cerrar ${anioStr}`,
+        icono: '🔒'
+    });
+    if (!confirmado) return;
+    
+    try {
+        const snapshot = calcularSnapshotAnual(anioStr);
+        guardarCierreAnual(anioStr, snapshot);
+        mostrarNotificacion(`🔒 Año ${anioStr} cerrado correctamente`, 'success');
+        
+        // Generar PDF automáticamente
+        window.descargarPDFCierreAnual(anioStr);
+        
+        window.dispatchEvent(new Event('refreshView'));
+    } catch (err) {
+        console.error('Error al cerrar año:', err);
+        mostrarNotificacion('Error al cerrar año: ' + err.message, 'error');
+    }
+};
+
+/**
+ * Reabre el año fiscal: elimina el cierre anual (con confirmación doble).
+ */
+window.reabrirAnioFiscal = async (anio) => {
+    const anioStr = String(anio);
+    const cierre = getCierreAnual(anioStr);
+    if (!cierre) {
+        mostrarNotificacion(`El año ${anioStr} no está cerrado`, 'warning');
+        return;
+    }
+    
+    const confirmado1 = await confirmarAccion({
+        titulo: `🔓 Reabrir Año Fiscal ${anioStr} - Confirmación 1`,
+        mensaje: `El año ${anioStr} fue cerrado el <strong>${formatDate(cierre.fechaCierre)}</strong>.<br><br>` +
+            `Al reabrirlo, se <strong>elimina el snapshot</strong> del cierre anual.<br><br>` +
+            `¿Continuar?`,
+        textoConfirmar: '🔓 Sí, continuar',
+        icono: '🔓'
+    });
+    if (!confirmado1) return;
+    
+    const confirmado2 = await confirmarAccion({
+        titulo: '🚨 CONFIRMACIÓN FINAL',
+        mensaje: `Se va a eliminar el cierre del año ${anioStr}.<br><br><strong>¿Estás 100% seguro?</strong>`,
+        textoConfirmar: '🚨 SÍ, REABRIR',
+        icono: '🚨'
+    });
+    if (!confirmado2) return;
+    
+    const db = getDB();
+    db.cierresAnuales = (db.cierresAnuales || []).filter(c => String(c.anio) !== anioStr);
+    guardarDB();
+    mostrarNotificacion(`🔓 Año ${anioStr} reabierto`, 'success');
+    window.dispatchEvent(new Event('refreshView'));
+};
+
+/**
+ * Genera y descarga el PDF del cierre anual.
+ */
+window.descargarPDFCierreAnual = (anio) => {
+    const anioStr = String(anio);
+    const cierre = getCierreAnual(anioStr);
+    if (!cierre) {
+        mostrarNotificacion(`El año ${anioStr} no está cerrado`, 'warning');
+        return;
+    }
+    
+    const s = cierre.snapshot;
+    const empresa = getDB().datosEmpresa || {};
+    
+    const html = `<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Cierre Anual ${anioStr}</title>
+<style>
+body { font-family: Arial, sans-serif; padding: 40px; color: #333; }
+h1 { border-bottom: 3px solid #2563eb; padding-bottom: 10px; }
+h2 { color: #2563eb; margin-top: 30px; border-bottom: 1px solid #ccc; padding-bottom: 5px; }
+table { width: 100%; border-collapse: collapse; margin: 15px 0; }
+th, td { padding: 8px; text-align: left; border-bottom: 1px solid #ddd; }
+th { background: #f3f4f6; font-weight: bold; }
+.total { font-weight: bold; background: #f9fafb; }
+.destacado { font-size: 1.3em; color: #059669; font-weight: bold; }
+.firma { margin-top: 60px; border-top: 1px solid #333; width: 300px; padding-top: 10px; }
+.header { display: flex; justify-content: space-between; margin-bottom: 20px; }
+</style>
+</head>
+<body>
+<div class="header">
+    <div>
+        <h1>${empresa.nombre || 'ERP Contable'}</h1>
+        <p>CUIT: ${empresa.cuit || '-'}</p>
+        <p>Condición IVA: ${empresa.condicionIVA || '-'}</p>
+    </div>
+    <div style="text-align: right;">
+        <p><strong>Cierre Anual ${anioStr}</strong></p>
+        <p>Fecha de cierre: ${formatDate(cierre.fechaCierre)}</p>
+    </div>
+</div>
+
+<h2>📊 Resumen Ejecutivo</h2>
+<table>
+<tr><th>Concepto</th><th>Monto</th></tr>
+<tr><td>Ventas brutas (con IVA)</td><td>$${formatNumber(s.ventas.brutas)}</td></tr>
+<tr><td>Ventas netas (sin IVA)</td><td>$${formatNumber(s.ventas.netas)}</td></tr>
+<tr><td>Cantidad de facturas</td><td>${s.ventas.cantidad}</td></tr>
+<tr class="total"><td>Ganancia neta del año</td><td class="destacado">$${formatNumber(s.ganancias.gananciaNeta)}</td></tr>
+</table>
+
+<h2>🛒 Compras por tipo de factura</h2>
+<table>
+<tr><th>Tipo</th><th>Monto</th></tr>
+<tr><td>Factura A</td><td>$${formatNumber(s.compras.facturaA)}</td></tr>
+<tr><td>Factura B</td><td>$${formatNumber(s.compras.facturaB)}</td></tr>
+<tr><td>Factura C (deducible)</td><td>$${formatNumber(s.compras.facturaC)}</td></tr>
+<tr class="total"><td>Costo total Ganancias</td><td>$${formatNumber(s.compras.costoGanancias)}</td></tr>
+</table>
+
+<h2>🧾 IVA del Año</h2>
+<table>
+<tr><th>Concepto</th><th>Monto</th></tr>
+<tr><td>IVA Ventas (débito fiscal)</td><td>+$${formatNumber(s.iva.ivaVentas)}</td></tr>
+<tr><td>IVA Compras (crédito fiscal)</td><td>-$${formatNumber(s.iva.ivaCompras)}</td></tr>
+<tr class="total"><td>IVA a pagar</td><td>$${formatNumber(s.iva.ivaAPagar)}</td></tr>
+${s.iva.saldoTecnico > 0 ? `<tr><td>Saldo técnico a favor</td><td class="destacado">$${formatNumber(s.iva.saldoTecnico)}</td></tr>` : ''}
+</table>
+
+<h2>🏦 Impuesto al Cheque</h2>
+<table>
+<tr><th>Concepto</th><th>Monto</th></tr>
+<tr><td>Débitos (pagos)</td><td>$${formatNumber(s.impuestoCheque.debitos)}</td></tr>
+<tr><td>Créditos (cobros)</td><td>$${formatNumber(s.impuestoCheque.creditos)}</td></tr>
+<tr class="total"><td>Total pagado a cuenta</td><td>$${formatNumber(s.impuestoCheque.total)}</td></tr>
+</table>
+
+<h2>📊 Resultado del Año</h2>
+<table>
+<tr><th>Concepto</th><th>Monto</th></tr>
+<tr><td>Ventas netas</td><td>$${formatNumber(s.ventas.netas)}</td></tr>
+<tr><td>− Costos (todas las facturas)</td><td>-$${formatNumber(s.compras.costoGanancias)}</td></tr>
+<tr><td>− IIBB</td><td>-$${formatNumber(s.iibb)}</td></tr>
+<tr><td>− TISSH</td><td>-$${formatNumber(s.tissh)}</td></tr>
+<tr><td>− Impuesto al cheque</td><td>-$${formatNumber(s.impuestoCheque.total)}</td></tr>
+<tr class="total"><td>= Utilidad antes de Ganancias</td><td>$${formatNumber(s.ganancias.utilidadAntes)}</td></tr>
+<tr><td>− Ganancias (25%)</td><td>-$${formatNumber(s.ganancias.ganancias)}</td></tr>
+<tr><td>− Reserva Legal SAS (5%)</td><td>-$${formatNumber(s.ganancias.reservaLegal)}</td></tr>
+<tr class="total"><td>💰 GANANCIA NETA DEL AÑO</td><td class="destacado">$${formatNumber(s.ganancias.gananciaNeta)}</td></tr>
+</table>
+
+<h2>💵 Impuesto a las Ganancias a Pagar</h2>
+<table>
+<tr><th>Concepto</th><th>Monto</th></tr>
+<tr><td>Ganancias calculadas (25%)</td><td>$${formatNumber(s.ganancias.ganancias)}</td></tr>
+<tr><td>− Impuesto al cheque pagado a cuenta</td><td>-$${formatNumber(s.impuestoCheque.total)}</td></tr>
+<tr class="total"><td>A PAGAR</td><td class="destacado">$${formatNumber(s.impuestoGananciasAPagar)}</td></tr>
+</table>
+
+<div class="firma">
+    <p>Firma del contador</p>
+    <p style="font-size: 0.8em; color: #666;">Cierre generado el ${formatDate(hoyISO())}</p>
+</div>
+
+</body>
+</html>`;
+    
+    // Abrir en nueva ventana para imprimir/guardar como PDF
+    const ventana = window.open('', '_blank');
+    ventana.document.write(html);
+    ventana.document.close();
+    setTimeout(() => ventana.print(), 500);
+};
+
+// ==================== 🔥 v7.22.35: BANNER DE ESTADO DEL AÑO ====================
+
+/**
+ * Genera el HTML del banner de estado del año (cerrado/abierto).
+ */
+window.renderBannerEstadoAnio = (anio) => {
+    const anioStr = String(anio);
+    const cierre = getCierreAnual(anioStr);
+    
+    if (cierre) {
+        return `
+            <div class="bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-500 rounded-2xl p-4 mb-4">
+                <div class="flex justify-between items-center flex-wrap gap-3">
+                    <div>
+                        <p class="font-bold text-blue-800 dark:text-blue-200">🔒 Año ${anioStr} cerrado</p>
+                        <p class="text-sm text-blue-600 dark:text-blue-300">Cerrado el ${formatDate(cierre.fechaCierre)}</p>
+                    </div>
+                    <div class="flex gap-2 flex-wrap">
+                        <button onclick="window.descargarPDFCierreAnual(${anioStr})" class="bg-blue-600 text-white px-3 py-1 rounded-xl text-sm">📄 Descargar PDF</button>
+                        <button onclick="window.reabrirAnioFiscal(${anioStr})" class="bg-orange-600 text-white px-3 py-1 rounded-xl text-sm">🔓 Reabrir año</button>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+    
+    // Verificar si hay saldos arrastrados del año anterior
+    const saldos = obtenerSaldosArrastrados(anioStr);
+    const bannerSaldos = saldos ? `
+        <div class="bg-green-50 dark:bg-green-900/20 border-l-4 border-green-500 rounded-2xl p-4 mb-4">
+            <p class="font-bold text-green-800 dark:text-green-200">📊 Saldos arrastrados del año ${saldos.anioOrigen}</p>
+            <p class="text-sm text-green-600 dark:text-green-300">
+                ${saldos.ivaAFavor > 0 ? `• IVA a favor: $${formatNumber(saldos.ivaAFavor)}<br>` : ''}
+                ${saldos.impuestoChequeAcumulado > 0 ? `• Impuesto al Cheque acumulado: $${formatNumber(saldos.impuestoChequeAcumulado)}<br>` : ''}
+            </p>
+        </div>
+    ` : '';
+    
+    return `
+        ${bannerSaldos}
+        <div class="bg-yellow-50 dark:bg-yellow-900/20 border-l-4 border-yellow-500 rounded-2xl p-4 mb-4">
+            <div class="flex justify-between items-center flex-wrap gap-3">
+                <div>
+                    <p class="font-bold text-yellow-800 dark:text-yellow-200">🔓 Año ${anioStr} abierto</p>
+                    <p class="text-sm text-yellow-600 dark:text-yellow-300">Podés cerrar el año para guardar un snapshot de todos los cálculos.</p>
+                </div>
+                <button onclick="window.cerrarAnioFiscal(${anioStr})" class="bg-yellow-600 text-white px-3 py-1 rounded-xl text-sm">🔒 Cerrar Año ${anioStr}</button>
+            </div>
+        </div>
+    `;
 };

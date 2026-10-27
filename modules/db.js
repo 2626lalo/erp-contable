@@ -105,7 +105,9 @@ let db = {
             otros: 0
         }
     },
-    cierresMensuales: []
+    cierresMensuales: [],
+    // 🔥 v7.22.35: cierres anuales (snapshot del año fiscal)
+    cierresAnuales: []
 };
 
 // ==================== SINCRONIZACIÓN ====================
@@ -285,6 +287,8 @@ export async function cargarDB() {
     if (!db.impuestosPersonalizados) db.impuestosPersonalizados = [];
     if (!db.historialTesoreria) db.historialTesoreria = [];
     if (!db.cierresMensuales) db.cierresMensuales = [];
+    if (!db.cierresAnuales) db.cierresAnuales = [];
+    if (!db.cierresAnuales) db.cierresAnuales = [];
     if (!db.aportesCapital) db.aportesCapital = [];
     if (!db.productos) db.productos = [];
     if (!db.movimientosStock) db.movimientosStock = [];
@@ -935,7 +939,52 @@ export function guardarSnapshotTesoreria(snapshot) {
 
 export function obtenerHistorialTesoreria() {
     const dbActual = getDB();
-    return dbActual.historialTesoreria || [];
+    const hoy = new Date();
+    const mesActual = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}`;
+    
+    // 🔥 v7.24.14: Para el mes actual, calcular en vivo (no usar snapshot)
+    const snapshotMesActual = (dbActual.historialTesoreria || []).find(h => h.mes === mesActual);
+    
+    // Calcular datos en vivo del mes actual
+    const movsMes = (dbActual.movimientos || []).filter(m => m.mes === mesActual);
+    const ingresos = movsMes.filter(m => m.tipo === 'ingreso').reduce((s, m) => s + (m.monto || 0), 0);
+    const egresos = movsMes.filter(m => m.tipo === 'egreso').reduce((s, m) => s + (m.monto || 0), 0);
+    const neto = ingresos - egresos;
+    
+    const ventasMes = (dbActual.ventas || []).filter(v => v.mes === mesActual);
+    const totalCobrado = ventasMes.filter(v => v.estado === 'cobrado').reduce((s, v) => s + (v.total || 0), 0);
+    
+    const comprasMes = (dbActual.compras || []).filter(c => c.fechaEmision && c.fechaEmision.startsWith(mesActual));
+    const totalPagado = comprasMes.filter(c => c.estadoPago === 'PAGADO').reduce((s, c) => s + (c.totalFactura || 0), 0);
+    
+    const ivaMes = calcularIVAMes(mesActual);
+    const impChequeMes = calcularImpuestoChequeMes(mesActual);
+    
+    // Capital acumulado (caja inicial + neto del mes)
+    const capitalAcumulado = neto; // Simplificado; si hay cierres anteriores, sumar
+    
+    const historialVivo = {
+        mes: mesActual,
+        saldoCaja: neto,
+        ivaAPagar: ivaMes.ivaAPagar,
+        totalCobrado: totalCobrado,
+        totalPagado: totalPagado,
+        capitalAcumulado: capitalAcumulado,
+        ventasCount: ventasMes.length
+    };
+    
+    // Combinar: snapshots de meses anteriores + datos vivos del mes actual
+    const historial = [...(dbActual.historialTesoreria || [])];
+    
+    // Reemplazar o agregar el mes actual
+    const idxMesActual = historial.findIndex(h => h.mes === mesActual);
+    if (idxMesActual >= 0) {
+        historial[idxMesActual] = historialVivo;
+    } else {
+        historial.push(historialVivo);
+    }
+    
+    return historial.sort((a, b) => a.mes.localeCompare(b.mes));
 }
 
 export function obtenerSnapshotPorMes(mes) {
@@ -1002,4 +1051,65 @@ export function recalcularImpuestoChequeTodos(nuevaAlicuota = 3) {
         guardarDB();
     }
     return { actualizados };
+}
+
+// ==================== 🔥 v7.22.35: HELPERS DE CIERRE ANUAL ====================
+
+/**
+ * Devuelve el cierre anual de un año (o null si no existe).
+ */
+export function getCierreAnual(anio) {
+    const db = getDB();
+    if (!db.cierresAnuales) return null;
+    return db.cierresAnuales.find(c => String(c.anio) === String(anio)) || null;
+}
+
+/**
+ * Guarda (o sobreescribe) el cierre anual de un año.
+ * @param {string|number} anio - Año fiscal (ej: 2026)
+ * @param {object} snapshot - Objeto con todos los cálculos del año
+ */
+export function guardarCierreAnual(anio, snapshot) {
+    const db = getDB();
+    if (!db.cierresAnuales) db.cierresAnuales = [];
+    
+    const idx = db.cierresAnuales.findIndex(c => String(c.anio) === String(anio));
+    const cierre = {
+        anio: String(anio),
+        fechaCierre: snapshot.fechaCierre || hoyISO(),
+        snapshot: snapshot
+    };
+    
+    if (idx >= 0) {
+        db.cierresAnuales[idx] = cierre;
+    } else {
+        db.cierresAnuales.push(cierre);
+    }
+    
+    guardarDB();
+    return cierre;
+}
+
+/**
+ * Lee el cierre del año anterior y devuelve los saldos a favor a arrastrar.
+ * @param {string|number} anio - Año actual (ej: 2027)
+ * @returns {object|null} - { ivaAFavor, impuestoChequeAcumulado, anioOrigen } o null
+ */
+export function obtenerSaldosArrastrados(anio) {
+    const anioAnterior = String(Number(anio) - 1);
+    const cierreAnterior = getCierreAnual(anioAnterior);
+    if (!cierreAnterior) return null;
+    
+    const snapshot = cierreAnterior.snapshot;
+    const ivaAFavor = snapshot.iva?.saldoTecnico > 0 ? snapshot.iva.saldoTecnico : 0;
+    const impuestoChequeAcumulado = snapshot.impuestoCheque?.total || 0;
+    
+    if (ivaAFavor === 0 && impuestoChequeAcumulado === 0) return null;
+    
+    return {
+        anioOrigen: anioAnterior,
+        ivaAFavor: ivaAFavor,
+        impuestoChequeAcumulado: impuestoChequeAcumulado,
+        fechaCierreOrigen: cierreAnterior.fechaCierre
+    };
 }

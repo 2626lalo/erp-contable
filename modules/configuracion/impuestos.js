@@ -3,7 +3,7 @@
 // ERP Contable Argentina - v7.16.1
 
 import { getDB, getTodosLosImpuestos, actualizarImpuesto, eliminarImpuestoPersonalizado, restablecerFormulasDefault } from '../db.js';
-import { mostrarNotificacion, escapeHtml } from '../utils.js';
+import { mostrarNotificacion, escapeHtml, confirmarAccion} from '../utils.js';
 import { crearModal, cerrarModal } from './helpers.js';
 
 // ==================== RENDER TAB ====================
@@ -59,8 +59,8 @@ export function initImpuestosEvents() {
         window.dispatchEvent(new Event('refreshView'));
     });
 
-    document.getElementById('btn-restablecer-impuestos')?.addEventListener('click', () => {
-        if (confirm('¿Restablecer impuestos a valores por defecto?')) {
+    document.getElementById('btn-restablecer-impuestos')?.addEventListener('click', async () => {
+        if (await confirmarAccion({ titulo: '🔄 Restablecer impuestos', mensaje: '¿Restablecer impuestos a valores por defecto?', textoConfirmar: '🔄 Sí, restablecer', icono: '🧮' })) {
             restablecerFormulasDefault();
             mostrarNotificacion('Impuestos restablecidos', 'success');
             window.dispatchEvent(new Event('refreshView'));
@@ -106,8 +106,8 @@ window.mostrarModalAgregarImpuesto = () => {
 };
 
 // ==================== ELIMINAR IMPUESTO ====================
-window.eliminarImpuestoPersonalizado = (id) => {
-    if (!confirm('¿Eliminar este impuesto personalizado? No se podrá recuperar.')) return;
+window.eliminarImpuestoPersonalizado = async (id) => {
+    if (!(await confirmarAccion({ titulo: '🗑️ Eliminar impuesto', mensaje: '¿Eliminar este impuesto personalizado? No se podrá recuperar.', textoConfirmar: '🗑️ Sí, eliminar', icono: '🧮' }))) return;
     eliminarImpuestoPersonalizado(id);
     mostrarNotificacion('Impuesto eliminado', 'info');
     window.dispatchEvent(new Event('refreshView'));
